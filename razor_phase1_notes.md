@@ -4,19 +4,22 @@
 
 # Razor — Phase 1 Prototype: What We Built, Observations, and Limitations
 
+Repository: https://github.com/NSmonish/razor-cli
+
 ## 1. Summary
 
-Razor is a CLI tool that generates a repo-specific `AGENTS.md` file — a concise
-"rulebook" that tells coding agents how a given project is set up (framework,
-testing tool, ORM, where routes live). The goal is right-sized, on-demand
-context so coding agents stop hallucinating and burning tokens on wrong guesses.
+Razor is a command-line tool that generates a repo-specific `AGENTS.md` file —
+a short reference that tells coding agents how a given project is set up
+(framework, testing tool, ORM, structure, commands). The aim is to give coding
+agents the context relevant to a repository so they rely less on guesswork.
 
-In Phase 1 we built a working end-to-end prototype: it scans a real repository,
-detects the stack with evidence, and uses an LLM to produce a strict `AGENTS.md`.
+In Phase 1 we built a working prototype that scans a repository, detects its
+stack with supporting evidence, and uses an LLM to produce an `AGENTS.md`. It
+also has an offline mode that produces the same file without an API call.
 
 ## 2. What we built
 
-**The pipeline:**
+**Pipeline:**
 
     repo folder  ->  scanner  ->  JSON (with evidence)  ->  LLM (Gemini)  ->  AGENTS.md
 
@@ -24,106 +27,151 @@ detects the stack with evidence, and uses an LLM to produce a strict `AGENTS.md`
 
 - `razor scan [dir]` — scans a repo and prints the detected data as JSON.
 - `razor init [dir]` — scans the repo (or reads a provided JSON file), sends it
-  to the LLM, and writes `AGENTS.md`. Supports `-i file.json` to skip scanning,
-  `-o` for output path, and `-m` to pick the model.
+  to the LLM, and writes `AGENTS.md`. Options: `-i` to use an input JSON file,
+  `-o` for the output path, `-m` to choose the model.
 
-**The scanner (evidence-based):**
+**Scanner:**
 
-- Walks the file tree, ignoring `node_modules`, `.git`, build dirs, etc., with
-  depth and file-count caps so it stays fast on large repos.
-- Records *evidence* for every fact — which file proved it (e.g.
-  "eslint.config.js (imports react)"). This directly supports Razor's
-  no-hallucination thesis.
-- Confirms frameworks from actual code imports where possible, not just the
-  dependency list.
+- Walks the file tree, skipping `node_modules`, `.git`, and build folders, with
+  depth and file-count caps for larger repos.
+- Records evidence for each detected fact — which file supports it (for example
+  "eslint.config.js imports react").
+- Where possible, confirms a framework from an actual code import rather than
+  the dependency list alone.
 - Detects Node and Python stacks:
   - Frameworks: Next.js, Nuxt, Angular, Svelte, Express, Fastify, NestJS, Koa,
-    Vue, React, Vite / Django, Flask, FastAPI.
-  - Testing: Jest, Vitest, Mocha / PyTest, unittest.
-  - ORMs: Prisma, Sequelize, TypeORM, Mongoose, Drizzle / SQLAlchemy,
+    Vue, React, Vite, Django, Flask, FastAPI.
+  - Testing: Jest, Vitest, Mocha, PyTest, unittest.
+  - ORMs: Prisma, Sequelize, TypeORM, Mongoose, Drizzle, SQLAlchemy,
     Django ORM, Peewee.
-- Static-site fallback for plain HTML/CSS/JS repos.
-- Nested-package detection for monorepos (e.g. frontend/ + backend/).
-- Extra signals: package manager, entry point, test locations, config files,
-  file count.
+- Extracts additional signals: npm scripts (build/test/dev/lint with the actual
+  commands), key dependencies, top-level directory structure, environment
+  variable names (from `.env.example`, names only), a README summary, test
+  locations, and config files.
+- Has a static-site fallback (plain HTML/CSS/JS) and basic detection of
+  sub-projects in monorepo layouts.
 
-**The LLM step:**
+**LLM step:**
 
-- Uses Google Gemini via the official SDK and a strict system prompt: output
-  only raw markdown, only state facts present in the scan, omit anything marked
-  "unknown" rather than guessing.
-- Retries up to 3 times with backoff on transient 503/429 responses.
-- Falls back to an offline "mock" `AGENTS.md` when no API key is set, so the
-  pipeline is always demoable and testable without the network.
+- Uses Google Gemini via the official SDK with a prompt that asks for a
+  structured document (Overview, Tech Stack, Project Structure, Commands,
+  Guardrails, Environment) and instructs the model to use only facts present in
+  the scan and omit anything marked unknown.
+- Retries up to three times on transient errors (503/429).
+- Falls back to an offline rendering of the scan when no API key is set, so the
+  pipeline can be run without the network.
 
-**Tests:** 10 automated tests (Node's built-in test runner, no extra deps),
-all passing. They cover the scanner detection (Node + Python), evidence output,
-empty-dir and bad-input handling, the prompt builder, the mock output, and a
-full CLI run.
+**Tests:** 10 automated tests (Node's built-in test runner, no extra
+dependencies), all passing. They cover scanner detection for Node and Python,
+evidence output, empty-directory and missing-input handling, the prompt builder,
+the offline rendering, and a full CLI run.
 
 ## 3. Observations from testing on real repositories
 
-We tested the scanner against real GitHub repos (not just toy fixtures). This
-surfaced real behavior:
+We ran the scanner against several real repositories rather than only toy
+fixtures. This gave a more realistic picture.
 
-| Repo | Detected | Correct? |
-|------|----------|----------|
-| Howzat | Python / Flask / SQLAlchemy | Yes — confirmed from requirements.txt |
-| PersonalizedDreamInterpreter | JavaScript / React / npm | Yes — React confirmed from eslint.config.js import |
-| Prudentia-Frontend | Static site (HTML/CSS/JS) | Yes — genuinely no framework |
-| TechLoop | Static site (HTML/CSS/JS) | Yes — genuinely no framework |
+| Repo | Detected | Notes |
+|------|----------|-------|
+| Howzat (ours) | Python / Flask / SQLAlchemy | Correct; confirmed from requirements.txt |
+| PersonalizedDreamInterpreter (ours) | JavaScript / React / npm | React confirmed from an eslint config import |
+| Static site repos (ours) | Static site (HTML/CSS/JS) | Correct; these have no framework |
+| nodejs-testing-best-practices | Express.js / Jest / Sequelize | Produced a full document with commands and structure |
+| full-stack-fastapi-template | React + FastAPI, with frontend/backend split | Detected the split and configs; per-package testing/ORM not fully reported |
+| prisma-examples | TypeScript / Vitest, framework/ORM unknown | Large monorepo of ~50 projects; sparse result is expected |
 
-**Key observations:**
+**Notes on the results:**
 
-- Testing on real repos was far more valuable than toy fixtures. Our first
-  scanner version returned "unknown" for several repos; investigating showed
-  most of those were actually *correct* (plain static sites with no framework),
-  while a couple exposed real gaps (frontend frameworks and nested packages)
-  that we then fixed.
-- The evidence field makes results auditable — we can see *why* the scanner
-  claims a repo uses React, which matters for trust and for debugging wrong
-  detections.
-- The strict prompt works: on Howzat the LLM correctly *omitted* the testing
-  framework (which was unknown) instead of inventing one. That is the
-  no-hallucination guardrail doing its job.
+- Testing on real repositories was more informative than toy fixtures. An early
+  version returned "unknown" for several repos; on inspection most of those were
+  correct (plain static sites), while a couple pointed to gaps we then
+  addressed (frontend frameworks, nested packages).
+- The evidence field makes results checkable — it shows which file supports a
+  given detection, which helps when a result looks wrong.
+- The prompt's "omit unknowns" instruction held up in practice: on a repo where
+  the testing framework was not detected, the generated file left it out rather
+  than filling it in.
 
-## 4. Limitations (honest)
+## 4. How to use and test Razor
 
-- **Static detection, not full AST analysis.** Detection is based on
-  dependency names and simple import matching. It handles common setups well
-  but can miss unusual or heavily customized configurations.
-- **Nested backends can be missed.** When a framework is detected at the repo
-  root, the scanner does not also surface a nested project's stack. Example:
-  a repo with a React frontend at the root and a separate `backend/` folder —
-  the backend's framework/ORM is not reported once the root framework is found.
-- **Front-end vs back-end ambiguity in monorepos.** For repos with both, we
-  currently report one primary stack rather than a full per-package breakdown.
-- **LLM dependency / availability.** The live generation step depends on the
-  Gemini API. During development the fast "flash" model intermittently returned
-  503 ("high demand"). The retry logic and the `-m` model override mitigate
-  this, and the offline mock path sidesteps it entirely, but a live demo can be
-  affected by upstream load.
-- **Model names drift.** `gemini-1.5-flash` from the original plan was already
-  retired; model IDs change, so the model is configurable rather than
-  hard-coded.
-- **Not yet measured.** Phase 1 proves "scan a real repo -> generate
-  right-sized context." It does NOT yet measure token savings or reduction in
-  developer correction loops. Those metrics are the next experiment (baseline
-  vs. Razor) and are required to validate the core efficiency claim.
+The full walkthrough is in `razor_teammate_guide.md` in the repository. Short
+version:
 
-## 5. What is still to build (beyond Phase 1)
+### Setup
 
-- Baseline measurement: tokens / correction-prompts without Razor vs. with
-  Razor, on a real repo task.
-- Beta testing with real users and measuring whether their rework drops.
-- The harder context thesis from the proposal: on-demand / progressive context
-  loading and the knowledge-graph "knowledge plane" that drove the larger token
-  savings in our interviews.
+    git clone https://github.com/NSmonish/razor-cli
+    cd razor-cli
+    npm install
+    cp .env.example .env        # then add a Gemini API key in .env
+
+A free Gemini key can be created at https://aistudio.google.com/apikey.
+
+### Run the tests
+
+    npm test                    # expect 10 passing
+
+### Try it on a public repo
+
+    rm -rf /tmp/test-repo
+    git clone --depth 1 https://github.com/zhanymkanov/fastapi-best-practices /tmp/test-repo
+
+Scan only (no LLM call):
+
+    node index.js scan /tmp/test-repo
+
+Scan and generate the file:
+
+    node index.js init /tmp/test-repo -o /tmp/test-AGENTS.md
+    cat /tmp/test-AGENTS.md
+
+### Offline mode (no API call)
+
+    env -u GEMINI_API_KEY node index.js init /tmp/test-repo -o /tmp/test-AGENTS.mock.md
+
+### Clean up
+
+    rm -rf /tmp/test-repo /tmp/test-AGENTS.md /tmp/test-AGENTS.mock.md
+
+### Command reference
+
+- `node index.js scan [dir]` — scan a repo, print JSON (`-o` to write a file).
+- `node index.js init [dir]` — scan and generate `AGENTS.md`.
+  - `-i file.json` — use an input JSON file instead of scanning.
+  - `-o file` — output path (default `AGENTS.md`).
+  - `-m model` — Gemini model (default `gemini-3.5-flash-lite`).
+
+## 5. Limitations
+
+- **Monorepos are partial.** For repositories with separate frontend and backend
+  packages, Razor detects the split and config files but may not report each
+  sub-package's testing tool or ORM, because it reads root-level dependency
+  files rather than deep-parsing every sub-package manifest. Single-application
+  repositories produce the fullest output.
+- **Static detection.** Detection is based on dependency names, config files,
+  and simple import checks. It can miss unusual setups and does not capture
+  domain-specific conventions that are not visible in the file layout.
+- **Depends on the LLM service.** The generation step uses the Gemini API.
+  During development the larger models were not available on a free-tier key and
+  some models returned temporary "high demand" errors; the default model
+  (`gemini-3.5-flash-lite`) worked, and the retry logic and offline mode reduce
+  the impact.
+- **Model names change.** The model originally planned (`gemini-1.5-flash`) was
+  already retired, so the model is configurable rather than fixed.
+- **Not yet measured.** The prototype shows that we can scan a repository and
+  generate a relevant `AGENTS.md`. It does not yet measure token usage or any
+  reduction in developer correction loops; that is the next step.
+
+## 6. What is still to build
+
+- A baseline measurement: tokens and correction prompts without Razor compared
+  with Razor, on a real task.
+- Beta testing with users and a measure of whether their rework decreases.
 - Deeper, per-package detection for monorepos.
+- The broader context approach from the proposal (on-demand or progressive
+  context, and the knowledge-graph idea from our interviews).
 
-## 6. Honest status
+## 7. Status
 
-- As the course **Oct 4 prototype milestone**: done and demoable.
-- As the full **Razor product**: this is the first layer — right-sized context
-  generation from a real repo scan. The efficiency *gains* remain a hypothesis
-  we have not yet measured.
+- As the course Oct 4 prototype milestone: complete and demonstrable.
+- As the full product: this is a first layer — generating repo-specific context
+  from a real scan. The efficiency benefits remain to be measured.
