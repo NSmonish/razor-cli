@@ -1,0 +1,5 @@
+{
+  "name": "demo-api",
+  "dependencies": { "express": "^4.19.0", "@prisma/client": "^5.0.0" },
+  "devDependencies": { "jest": "^29.0.0", "prisma": "^5.0.0" }
+}

@@ -1,0 +1,6 @@
+{
+  "framework": "Express.js",
+  "testing": "Jest",
+  "orm": "Prisma",
+  "routes_folder": "/src/api/routes"
+}

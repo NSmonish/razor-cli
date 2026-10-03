@@ -1,0 +1,23 @@
+{
+  "name": "razor-cli",
+  "version": "1.0.0",
+  "description": "Razor CLI — generate repo-specific AGENTS.md context for coding agents",
+  "main": "index.js",
+  "bin": {
+    "razor": "index.js"
+  },
+  "scripts": {
+    "start": "node index.js",
+    "test": "node --test test/*.test.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "@google/generative-ai": "^0.24.1",
+    "chalk": "^4.1.2",
+    "commander": "^12.1.0",
+    "dotenv": "^18.0.5"
+  }
+}
