@@ -410,35 +410,75 @@ function withDocHeader(name, body, docMeta) {
   return head + '\n\n' + body.replace(/^\s+/, '');
 }
 
-// trigger keywords per skill — a cheap routing signal so a consuming agent (or
-// a pre-step) can match a task to a skill without loading every SKILL.md. these
-// are hints, not hard rules; the skill description is still the primary signal.
-const SKILL_TRIGGERS = {
-  'run-tests': ['test', 'tests', 'failing test', 'unit test', 'verify', 'spec'],
-  'lint-fix': ['lint', 'format', 'style', 'eslint', 'prettier', 'formatting'],
-  'code-push': ['push', 'commit', 'pull request', 'pr', 'merge', 'ship'],
-  'db-migrations': ['migration', 'migrate', 'schema', 'database', 'db', 'model change'],
-  'local-env': ['run locally', 'docker', 'container', 'compose', 'dev environment', 'spin up'],
-  build: ['build', 'compile', 'bazel', 'cargo', 'make', 'gradle', 'maven'],
+// optional synonym overlay — ENRICHES derived triggers with known synonyms.
+// this is NOT the source of truth: a skill with no entry here still gets
+// triggers derived from its own data. safe to leave a new skill out.
+const TRIGGER_SYNONYMS = {
+  'run-tests': ['failing test', 'unit test', 'spec', 'verify'],
+  'lint-fix': ['format', 'style', 'formatting'],
+  'code-push': ['commit', 'pull request', 'pr', 'merge', 'ship'],
+  'db-migrations': ['schema', 'model change'],
+  'local-env': ['run locally', 'spin up', 'dev environment'],
+  build: ['compile'],
 };
+
+// stopwords we don't want as routing triggers
+const TRIGGER_STOP = new Set([
+  'the', 'a', 'an', 'to', 'and', 'or', 'with', 'for', 'use', 'when', 'this',
+  'project', 'your', 'then', 'from', 'into', 'detected', 'user-requested',
+  'repo', 'suite', 'before', 'after', 'using', 'via', 'of', 'in', 'on', 'it',
+]);
+
+// derive routing triggers from the skill's OWN data, so they always exist and
+// always reflect the current skill (new or updated). pulls words from the name,
+// intent/description, and any framework/orm/build-system/command fields, then
+// adds known synonyms as an overlay. deduped, lowercased.
+function deriveTriggers(skill, description) {
+  const bag = [];
+  const push = (str) => {
+    if (!str) return;
+    for (const w of String(str).toLowerCase().match(/[a-z][a-z0-9.+-]{2,}/g) || []) {
+      if (!TRIGGER_STOP.has(w)) bag.push(w);
+    }
+  };
+  // the name split on hyphens is a strong signal (run-tests -> run, tests)
+  push(skill.name.replace(/-/g, ' '));
+  push(skill.intent);
+  push(description);
+  push(skill.framework);
+  push(skill.orm);
+  push(skill.buildSystem);
+  // the actual command often names the tool (jest, eslint, bazel, prisma)
+  if (skill.command) push(skill.command);
+  if (skill.testCommand) push(skill.testCommand);
+  // overlay curated synonyms (optional, enriches only)
+  for (const syn of TRIGGER_SYNONYMS[skill.name] || []) bag.push(syn.toLowerCase());
+  // dedupe, keep order, cap so the manifest stays small
+  return [...new Set(bag)].slice(0, 12);
+}
 
 // build a machine-readable routing manifest from the plan. this is the "router"
 // deliverable: a map of task-intent -> skill with triggers, path, and evidence,
 // so routing is explicit and cheap instead of free-matching long descriptions.
+// triggers are DERIVED from each skill at generation time (regenerated on every
+// scaffold/add-skill) so they never drift from the actual skills on disk.
 // the actual loading is still done by the consuming agent at runtime.
 function buildRoutingManifest(plan, layout) {
   return {
     razor_format: RAZOR_FORMAT_VERSION,
     generated: today(),
     entry: layout.entry,
-    skills: plan.skills.map((s) => ({
-      name: s.name,
-      description: skillDescription(s),
-      path: `${layout.skillDir}/${s.name}/SKILL.md`,
-      triggers: SKILL_TRIGGERS[s.name] || [],
-      evidence: s.verified === false ? null : (s.evidence || null),
-      verified: s.verified !== false,
-    })),
+    skills: plan.skills.map((s) => {
+      const description = skillDescription(s);
+      return {
+        name: s.name,
+        description,
+        path: `${layout.skillDir}/${s.name}/SKILL.md`,
+        triggers: deriveTriggers(s, description),
+        evidence: s.verified === false ? null : (s.evidence || null),
+        verified: s.verified !== false,
+      };
+    }),
   };
 }
 
@@ -527,6 +567,8 @@ module.exports = {
   emitScaffold,
   buildDocDrafts,
   layoutFor,
+  buildRoutingManifest,
+  deriveTriggers,
   renderSkillFile: renderSkill,
   // exported for tests
   renderEntry, renderOverview, renderSkill, renderCheckScript,

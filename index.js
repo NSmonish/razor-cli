@@ -9,7 +9,7 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 const { scanRepo } = require('./scanner');
 const { detectWorkflows } = require('./workflows');
 const { planScaffold, knownSkillNames, buildRequestedSkill } = require('./planner');
-const { emitScaffold, buildDocDrafts, renderSkillFile, layoutFor } = require('./emitter');
+const { emitScaffold, buildDocDrafts, renderSkillFile, layoutFor, buildRoutingManifest } = require('./emitter');
 const { enrichDocs } = require('./enricher');
 
 // strict prompt — keep the model terse, no fluff, raw markdown only
@@ -263,12 +263,21 @@ function runCli() {
         fs.mkdirSync(path.dirname(full), { recursive: true });
         fs.writeFileSync(full, renderSkillFile(result.skill, scan));
 
+        // regenerate the routing manifest so the new/updated skill is routable.
+        // union of the repo's detected skills + the one just added (deduped).
+        const plan = planScaffold(scan, flows);
+        const bySamePath = (s) => s.name === result.skill.name;
+        const skills = [...plan.skills.filter((s) => !bySamePath(s)), result.skill];
+        const manifest = buildRoutingManifest({ skills }, layout);
+        fs.writeFileSync(path.join(opts.output, 'skills.index.json'), JSON.stringify(manifest, null, 2) + '\n');
+
         if (result.verified) {
           console.log(chalk.green(`Added grounded skill '${skillName}' -> ${rel}`));
         } else {
           console.log(chalk.yellow(`Added '${skillName}' -> ${rel}`));
           console.log(chalk.yellow('  ⚠ No evidence for this skill in the repo — it is marked UNVERIFIED.'));
         }
+        console.log(chalk.gray('  routing manifest (skills.index.json) regenerated.'));
       } catch (e) {
         console.error(chalk.red('add-skill failed:'), e.message || e);
         process.exit(1);

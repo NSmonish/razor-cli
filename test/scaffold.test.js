@@ -300,9 +300,32 @@ test('scaffold emits a routing manifest mapping skills to triggers', () => {
   assert.ok(Array.isArray(m.skills) && m.skills.length === plan.skills.length, 'one entry per skill');
   const rt = m.skills.find((s) => s.name === 'run-tests');
   assert.ok(rt, 'run-tests present in manifest');
-  assert.ok(rt.triggers.includes('test'), 'run-tests has a test trigger');
+  assert.ok(rt.triggers.includes('tests'), 'run-tests triggers derived from its name');
   assert.ok(rt.path.endsWith('run-tests/SKILL.md'), 'manifest records the skill path');
   fs.rmSync(tmp, { recursive: true, force: true });
+});
+
+test('triggers are derived from skill data even without a synonym entry', () => {
+  const { deriveTriggers } = require('../emitter.js');
+  // a hypothetical brand-new skill not in any curated list
+  const t = deriveTriggers(
+    { name: 'deploy-service', intent: 'deploy the service to staging', command: 'kubectl apply' },
+    'Deploy the service. Use when shipping to staging.',
+  );
+  assert.ok(t.includes('deploy'), 'derives from the name');
+  assert.ok(t.includes('service'), 'derives from name/intent');
+  assert.ok(t.includes('kubectl'), 'derives tool from the command');
+  assert.ok(t.length > 0, 'never empty for a real skill');
+});
+
+test('a build skill derives build-system triggers (bazel) with no hand authoring', () => {
+  const { deriveTriggers } = require('../emitter.js');
+  const t = deriveTriggers(
+    { name: 'build', intent: 'build the project with Bazel', buildSystem: 'Bazel', command: 'bazel build //...' },
+    'Build the project with Bazel.',
+  );
+  assert.ok(t.includes('build'), 'has build');
+  assert.ok(t.includes('bazel'), 'derives bazel from build system/command');
 });
 
 test('knownSkillNames lists the full catalog', () => {
