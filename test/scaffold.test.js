@@ -44,6 +44,44 @@ test('detectWorkflows finds a Dockerfile and migrations dir', () => {
   fs.rmSync(tmp, { recursive: true, force: true });
 });
 
+test('detectWorkflows identifies Bazel as the build system', () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'razor-bazel-'));
+  fs.writeFileSync(path.join(tmp, 'WORKSPACE'), '');
+  fs.writeFileSync(path.join(tmp, 'BUILD'), '');
+  const f = detectWorkflows(tmp);
+  assert.equal(f.buildSystem, 'Bazel');
+  assert.equal(f.buildCommand, 'bazel build //...');
+  assert.equal(f.testCommand, 'bazel test //...');
+  fs.rmSync(tmp, { recursive: true, force: true });
+});
+
+test('detectWorkflows identifies Cargo and Go', () => {
+  const t1 = fs.mkdtempSync(path.join(os.tmpdir(), 'razor-cargo-'));
+  fs.writeFileSync(path.join(t1, 'Cargo.toml'), '[package]\n');
+  assert.equal(detectWorkflows(t1).buildSystem, 'Cargo (Rust)');
+  fs.rmSync(t1, { recursive: true, force: true });
+
+  const t2 = fs.mkdtempSync(path.join(os.tmpdir(), 'razor-go-'));
+  fs.writeFileSync(path.join(t2, 'go.mod'), 'module x\n');
+  assert.equal(detectWorkflows(t2).buildSystem, 'Go modules');
+  fs.rmSync(t2, { recursive: true, force: true });
+});
+
+test('planner adds a build skill and build-system check script for a bazel repo', () => {
+  const scan = { testing: 'unknown', orm: 'unknown', scripts: {}, structure: [], sub_projects: [], evidence: {} };
+  const flows = {
+    hasGitRemote: false, hasCI: false, hasDocker: false, hasMigrations: false, hasLint: false,
+    buildSystem: 'Bazel', buildCommand: 'bazel build //...', testCommand: 'bazel test //...',
+    evidence: { build_system: 'WORKSPACE' },
+  };
+  const plan = planScaffold(scan, flows);
+  const build = plan.skills.find((s) => s.name === 'build');
+  assert.ok(build, 'should propose a build skill');
+  assert.equal(build.command, 'bazel build //...');
+  assert.ok(plan.script, 'should emit a check script');
+  assert.ok(plan.script.steps.includes('bazel test //...'), 'check script uses the bazel test command');
+});
+
 // ---- planner: candidate skills --------------------------------------------
 
 test('candidateSkills proposes run-tests only when a test runner exists', () => {

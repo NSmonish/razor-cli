@@ -95,6 +95,33 @@ function detectWorkflows(dir) {
   const taskFile = firstExisting(root, ['Makefile', 'justfile', 'Taskfile.yml']);
   if (taskFile) { hasTaskRunner = true; ev.task_runner = taskFile; }
 
+  // build system — detect the real way this repo is built, beyond node/python.
+  // ordered so the more specific/authoritative marker wins.
+  let buildSystem = null;      // human label
+  let buildCommand = null;     // the real build command
+  let testCommand = null;      // the real test command
+  const bs = (name, build, test, evidence) => {
+    buildSystem = name; buildCommand = build; testCommand = test; ev.build_system = evidence;
+  };
+  if (exists(root, 'WORKSPACE') || exists(root, 'WORKSPACE.bazel') || exists(root, 'MODULE.bazel')) {
+    bs('Bazel', 'bazel build //...', 'bazel test //...',
+      firstExisting(root, ['MODULE.bazel', 'WORKSPACE.bazel', 'WORKSPACE']));
+  } else if (exists(root, 'Cargo.toml')) {
+    bs('Cargo (Rust)', 'cargo build', 'cargo test', 'Cargo.toml');
+  } else if (exists(root, 'go.mod')) {
+    bs('Go modules', 'go build ./...', 'go test ./...', 'go.mod');
+  } else if (exists(root, 'pom.xml')) {
+    bs('Maven', 'mvn compile', 'mvn test', 'pom.xml');
+  } else if (exists(root, 'build.gradle') || exists(root, 'build.gradle.kts')) {
+    bs('Gradle', './gradlew build', './gradlew test',
+      firstExisting(root, ['build.gradle', 'build.gradle.kts']));
+  } else if (exists(root, 'CMakeLists.txt')) {
+    bs('CMake', 'cmake -S . -B build && cmake --build build', 'ctest --test-dir build', 'CMakeLists.txt');
+  } else if (taskFile === 'Makefile') {
+    // only treat Make as the build system if nothing more specific matched
+    bs('Make', 'make', 'make test', 'Makefile');
+  }
+
   return {
     hasGitRemote,
     hasCI,
@@ -102,6 +129,9 @@ function detectWorkflows(dir) {
     hasMigrations,
     hasLint,
     hasTaskRunner,
+    buildSystem,
+    buildCommand,
+    testCommand,
     evidence: ev,
   };
 }

@@ -72,6 +72,20 @@ function candidateSkills(scan, flows) {
     });
   }
 
+  // build — only if a real build system was detected (bazel/cargo/go/cmake/etc).
+  // this is what makes non-node/python repos (C/C++, Rust, Go, Java) useful.
+  if (flows.buildSystem) {
+    skills.push({
+      name: 'build',
+      intent: `build the project with ${flows.buildSystem}`,
+      buildSystem: flows.buildSystem,
+      command: flows.buildCommand,
+      testCommand: flows.testCommand,
+      evidence: flows.evidence.build_system,
+      complex: false,
+    });
+  }
+
   return skills;
 }
 
@@ -90,16 +104,16 @@ function candidateDocs(scan, flows) {
     docs.push({ name: 'architecture', reason: 'non-trivial directory structure' });
   }
 
-  // workflows — only if there are real workflows (scripts or ci/docker/migrations)
+  // workflows — only if there are real workflows (scripts or ci/docker/migrations/build)
   const hasWorkflows = (scan.scripts && Object.keys(scan.scripts).length > 0) ||
-    flows.hasCI || flows.hasDocker || flows.hasMigrations;
+    flows.hasCI || flows.hasDocker || flows.hasMigrations || !!flows.buildSystem;
   if (hasWorkflows) {
     docs.push({ name: 'workflows', reason: 'has build/test/deploy workflows' });
   }
 
-  // verification — only if there's a way to verify (tests or lint)
-  if (known(scan.testing) || flows.hasLint) {
-    docs.push({ name: 'verification', reason: 'has tests and/or lint to verify work' });
+  // verification — only if there's a way to verify (tests, lint, or a build system)
+  if (known(scan.testing) || flows.hasLint || !!flows.buildSystem) {
+    docs.push({ name: 'verification', reason: 'has tests, lint, or a build to verify work' });
   }
 
   // steering — global conventions. worth it once the repo is non-trivial.
@@ -116,7 +130,11 @@ function candidateScript(scan, flows) {
   const steps = [];
   if (scripts.lint) steps.push(scripts.lint);
   if (scripts.test) steps.push(scripts.test);
-  // python repos without npm scripts: fall back to common commands if evidenced
+  // non-node/python repos: prefer the detected build system's test command
+  if (!steps.length && flows.testCommand) {
+    steps.push(flows.testCommand);
+  }
+  // python repos without npm scripts or a build system: fall back to pytest
   if (!steps.length && known(scan.testing) && /pytest/i.test(scan.testing)) {
     steps.push('pytest');
   }

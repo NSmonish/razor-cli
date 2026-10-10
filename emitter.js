@@ -60,7 +60,7 @@ function renderEntry(scan, plan, layout = { docDir: '', skillDir: 'skills' }) {
   return L.join('\n');
 }
 
-function renderOverview(scan) {
+function renderOverview(scan, flows = {}) {
   const L = [];
   L.push('# Overview');
   L.push('');
@@ -69,6 +69,7 @@ function renderOverview(scan) {
   L.push('## Stack');
   if (known(scan.language)) L.push(`- Language: ${scan.language}`);
   if (known(scan.framework)) L.push(`- Framework: ${scan.framework}`);
+  if (flows.buildSystem) L.push(`- Build system: ${flows.buildSystem}`);
   if (known(scan.testing)) L.push(`- Testing: ${scan.testing}`);
   if (known(scan.orm)) L.push(`- ORM / data layer: ${scan.orm}`);
   if (known(scan.package_manager)) L.push(`- Package manager: ${scan.package_manager}`);
@@ -95,6 +96,7 @@ function renderOverview(scan) {
   else if (scripts.start) L.push(`- Start: ${code(scripts.start)}`);
   else if (known(scan.entry_point)) L.push(`- Entry point is ${code(scan.entry_point)} — run it with the appropriate runtime.`);
   if (scripts.build) L.push(`- Build: ${code(scripts.build)}`);
+  else if (flows.buildCommand) L.push(`- Build: ${code(flows.buildCommand)}`);
   L.push('');
   return L.join('\n');
 }
@@ -140,6 +142,14 @@ function renderWorkflows(scan, flows) {
     for (const [k, v] of Object.entries(scripts)) L.push(`- ${code(k)}: ${code(v)}`);
     L.push('');
   }
+  if (flows.buildSystem) {
+    L.push('## Build');
+    L.push(`- Build system: ${flows.buildSystem} (${flows.evidence.build_system}).`);
+    if (flows.buildCommand) L.push(`- Build: ${code(flows.buildCommand)}`);
+    if (flows.testCommand) L.push(`- Test: ${code(flows.testCommand)}`);
+    L.push(`- Prefer ${flows.buildSystem} over compiling or running files directly.`);
+    L.push('');
+  }
   if (flows.hasCI) {
     L.push('## CI');
     L.push(`- CI is configured (${flows.evidence.ci}). Changes should keep CI green.`);
@@ -169,6 +179,7 @@ function renderVerification(scan, flows, plan) {
   if (scripts.lint) L.push(`- Lint: ${code(scripts.lint)}`);
   else if (flows.hasLint) L.push(`- Lint config present (${flows.evidence.lint}) — run the project linter.`);
   if (scripts.test) L.push(`- Tests: ${code(scripts.test)}`);
+  else if (flows.testCommand) L.push(`- Tests: ${code(flows.testCommand)} (${flows.buildSystem}).`);
   else if (known(scan.testing)) L.push(`- Tests use ${scan.testing} — run the suite.`);
   if (scripts.typecheck) L.push(`- Typecheck: ${code(scripts.typecheck)}`);
   if (L[L.length - 1] === '## Checks') L.push('- No automated checks detected — verify changes manually.');
@@ -238,6 +249,7 @@ function skillDescription(skill) {
     'code-push': 'Verify then push changes to the remote. Use when the user asks to commit/push/open a PR.',
     'db-migrations': `Create and apply database migrations (${skill.orm || 'detected ORM'}). Use when changing the data model.`,
     'local-env': 'Build and run the app locally with containers. Use to spin up a reproducible dev environment.',
+    build: `Build the project with ${skill.buildSystem || 'the detected build system'}. Use before running or testing.`,
   };
   return map[skill.name] || skill.intent;
 }
@@ -274,6 +286,12 @@ function skillSteps(skill, scan) {
     case 'local-env':
       S.push('1. Build the image / bring the stack up (see the Dockerfile / compose file).');
       S.push('2. Use the containerized env rather than installing services globally.');
+      break;
+    case 'build':
+      if (skill.command) S.push(`1. Build with ${code(skill.command)}.`);
+      else S.push(`1. Build the project using ${skill.buildSystem || 'the project build system'}.`);
+      if (skill.testCommand) S.push(`2. Run tests with ${code(skill.testCommand)}.`);
+      S.push(`${skill.testCommand ? 3 : 2}. Use ${skill.buildSystem || 'the build system'} rather than compiling files by hand.`);
       break;
     default:
       S.push(`1. ${skill.intent}.`);
@@ -317,7 +335,7 @@ function renderCheckScript(plan) {
 // ---- main emit ------------------------------------------------------------
 
 const DOC_RENDERERS = {
-  overview: (scan) => renderOverview(scan),
+  overview: (scan, flows) => renderOverview(scan, flows),
   architecture: (scan) => renderArchitecture(scan),
   workflows: (scan, flows) => renderWorkflows(scan, flows),
   verification: (scan, flows, plan) => renderVerification(scan, flows, plan),
