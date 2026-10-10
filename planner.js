@@ -6,76 +6,69 @@
 
 const known = (v) => v && v !== 'unknown';
 
-// decide which skills a repo warrants, based on what the scan actually found.
-// each candidate carries its evidence and (where relevant) the repo's real
-// command, so downstream rendering never invents commands.
-function candidateSkills(scan, flows) {
-  const skills = [];
-  const scripts = scan.scripts || {};
-
-  // run-tests — only if a test runner was detected
-  if (known(scan.testing)) {
-    skills.push({
+// SKILL REGISTRY — one declared entry per possible skill. each has:
+//   name     : skill id
+//   build(scan, flows) -> a skill object if the repo's evidence supports it,
+//                         or null if it should NOT be generated.
+// keeping every skill in one list makes coverage auditable (easy to see the
+// full catalog) and lets the user-add flow look a skill up by name. adding a
+// new skill = one registry entry; it can't be "missed" by a scattered if.
+const SKILL_REGISTRY = [
+  {
+    name: 'run-tests',
+    build: (scan) => known(scan.testing) && {
       name: 'run-tests',
       intent: 'run the test suite',
-      command: scripts.test || null,
+      command: (scan.scripts || {}).test || null,
       framework: scan.testing,
       evidence: scan.evidence.testing || `testing: ${scan.testing}`,
       complex: false,
-    });
-  }
-
-  // lint-fix — only if a lint/format config exists
-  if (flows.hasLint) {
-    skills.push({
+    },
+  },
+  {
+    name: 'lint-fix',
+    build: (scan, flows) => flows.hasLint && {
       name: 'lint-fix',
       intent: 'lint and auto-fix code style',
-      command: scripts.lint || null,
+      command: (scan.scripts || {}).lint || null,
       evidence: flows.evidence.lint,
       complex: false,
-    });
-  }
-
-  // code-push — only if there's somewhere to push (remote) and ideally CI
-  if (flows.hasGitRemote) {
-    skills.push({
+    },
+  },
+  {
+    name: 'code-push',
+    build: (scan, flows) => flows.hasGitRemote && {
       name: 'code-push',
       intent: 'verify and push changes',
-      // steps use whatever verification the repo actually has
-      verify: [scripts.lint, scripts.test].filter(Boolean),
+      verify: [(scan.scripts || {}).lint, (scan.scripts || {}).test].filter(Boolean),
       hasCI: flows.hasCI,
       evidence: [flows.evidence.git_remote, flows.evidence.ci].filter(Boolean).join('; '),
       complex: false,
-    });
-  }
-
-  // db-migrations — only if there's an ORM AND migration machinery
-  if (known(scan.orm) && flows.hasMigrations) {
-    skills.push({
+    },
+  },
+  {
+    name: 'db-migrations',
+    build: (scan, flows) => (known(scan.orm) && flows.hasMigrations) && {
       name: 'db-migrations',
       intent: 'create and apply database migrations',
-      command: scripts.migrate || null,
+      command: (scan.scripts || {}).migrate || null,
       orm: scan.orm,
       evidence: [scan.evidence.orm, flows.evidence.migrations].filter(Boolean).join('; '),
-      // migrations are fiddly -> flag for a deeper reference doc
       complex: true,
-    });
-  }
-
-  // local-env — only if the repo is containerized
-  if (flows.hasDocker) {
-    skills.push({
+    },
+  },
+  {
+    name: 'local-env',
+    build: (scan, flows) => flows.hasDocker && {
       name: 'local-env',
       intent: 'build and run the app locally with containers',
       evidence: flows.evidence.docker,
       complex: false,
-    });
-  }
-
-  // build — only if a real build system was detected (bazel/cargo/go/cmake/etc).
-  // this is what makes non-node/python repos (C/C++, Rust, Go, Java) useful.
-  if (flows.buildSystem) {
-    skills.push({
+    },
+  },
+  {
+    name: 'build',
+    build: (scan, flows) => flows.buildSystem && {
       name: 'build',
       intent: `build the project with ${flows.buildSystem}`,
       buildSystem: flows.buildSystem,
@@ -83,10 +76,49 @@ function candidateSkills(scan, flows) {
       testCommand: flows.testCommand,
       evidence: flows.evidence.build_system,
       complex: false,
-    });
-  }
+    },
+  },
+];
 
+// the full catalog of skill names Razor knows how to generate
+function knownSkillNames() {
+  return SKILL_REGISTRY.map((s) => s.name);
+}
+
+// decide which skills a repo warrants, by running every registry entry's
+// detector. each returned candidate is grounded (carries evidence + real
+// command). the LLM layer may later trim this, never add to it.
+function candidateSkills(scan, flows) {
+  const skills = [];
+  for (const entry of SKILL_REGISTRY) {
+    const s = entry.build(scan, flows);
+    if (s) skills.push(s);
+  }
   return skills;
+}
+
+// user-requested skill: try to build the named skill from the current scan.
+// returns { skill, verified }:
+//  - if the registry detector fires (evidence exists) -> grounded skill.
+//  - if evidence is missing but the skill is known -> a stub marked verified:false
+//    (honest: generated on request but flagged as not grounded in this repo).
+//  - if the name is unknown -> null.
+function buildRequestedSkill(name, scan, flows) {
+  const entry = SKILL_REGISTRY.find((s) => s.name === name);
+  if (!entry) return null;
+  const grounded = entry.build(scan, flows);
+  if (grounded) return { skill: { ...grounded, verified: true }, verified: true };
+  // known skill, no evidence -> honest unverified stub
+  return {
+    skill: {
+      name,
+      intent: `(user-requested) ${name}`,
+      evidence: null,
+      complex: false,
+      verified: false,
+    },
+    verified: false,
+  };
 }
 
 // decide which top-level docs make sense. a tiny repo gets almost nothing;
@@ -157,4 +189,7 @@ function planScaffold(scan, flows) {
   };
 }
 
-module.exports = { planScaffold, candidateSkills, candidateDocs, candidateScript };
+module.exports = {
+  planScaffold, candidateSkills, candidateDocs, candidateScript,
+  knownSkillNames, buildRequestedSkill,
+};

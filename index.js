@@ -8,8 +8,8 @@ const chalk = require('chalk');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const { scanRepo } = require('./scanner');
 const { detectWorkflows } = require('./workflows');
-const { planScaffold } = require('./planner');
-const { emitScaffold, buildDocDrafts } = require('./emitter');
+const { planScaffold, knownSkillNames, buildRequestedSkill } = require('./planner');
+const { emitScaffold, buildDocDrafts, renderSkillFile, layoutFor } = require('./emitter');
 const { enrichDocs } = require('./enricher');
 
 // strict prompt — keep the model terse, no fluff, raw markdown only
@@ -234,6 +234,43 @@ function runCli() {
         console.log(chalk.gray(`\n${result.note}`));
       } catch (e) {
         console.error(chalk.red('Scaffold failed:'), e.message || e);
+        process.exit(1);
+      }
+    });
+
+  program
+    .command('add-skill')
+    .description('Re-scan the repo and add a named skill into an existing context pack')
+    .argument('<skill>', `skill to add (known: ${knownSkillNames().join(', ')})`)
+    .argument('[dir]', 'directory to re-scan', '.')
+    .option('-o, --output <dir>', 'the existing context pack directory', '.agent')
+    .option('-t, --target <tool>', 'target layout: agents-md | kiro | claude', 'agents-md')
+    .action((skillName, dir, opts) => {
+      try {
+        const scan = scanRepo(dir);
+        const flows = detectWorkflows(dir);
+        const result = buildRequestedSkill(skillName, scan, flows);
+
+        if (!result) {
+          console.error(chalk.red(`Unknown skill: ${skillName}`));
+          console.error(chalk.gray(`Known skills: ${knownSkillNames().join(', ')}`));
+          process.exit(1);
+        }
+
+        const layout = layoutFor(opts.target);
+        const rel = path.join(layout.skillDir, result.skill.name, 'SKILL.md');
+        const full = path.join(opts.output, rel);
+        fs.mkdirSync(path.dirname(full), { recursive: true });
+        fs.writeFileSync(full, renderSkillFile(result.skill, scan));
+
+        if (result.verified) {
+          console.log(chalk.green(`Added grounded skill '${skillName}' -> ${rel}`));
+        } else {
+          console.log(chalk.yellow(`Added '${skillName}' -> ${rel}`));
+          console.log(chalk.yellow('  ⚠ No evidence for this skill in the repo — it is marked UNVERIFIED.'));
+        }
+      } catch (e) {
+        console.error(chalk.red('add-skill failed:'), e.message || e);
         process.exit(1);
       }
     });

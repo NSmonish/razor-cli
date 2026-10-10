@@ -190,7 +190,7 @@ test('emitScaffold writes a full pack with entry, docs, skills and script', () =
     const skillMd = fs.readFileSync(path.join(tmp, 'skills', s.name, 'SKILL.md'), 'utf8');
     assert.ok(skillMd.includes('name: ' + s.name), `${s.name} has frontmatter name`);
     assert.ok(skillMd.includes('description:'), `${s.name} has a description`);
-    assert.ok(skillMd.includes('Evidence:'), `${s.name} records evidence`);
+    assert.ok(/evidence:/i.test(skillMd), `${s.name} records evidence`);
   }
 
   assert.ok(written.length >= 2, 'wrote multiple files');
@@ -238,6 +238,34 @@ test('claude target puts skills under .claude/skills and keeps AGENTS.md (no CLA
   fs.rmSync(tmp, { recursive: true, force: true });
 });
 
+test('every generated file carries the standard versioned header', () => {
+  const { scanRepo } = require('../scanner.js');
+  const { emitScaffold } = require('../emitter.js');
+  const scan = scanRepo(NODE_FIXTURE);
+  const flows = detectWorkflows(NODE_FIXTURE);
+  const plan = planScaffold(scan, flows);
+
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'razor-hdr-'));
+  emitScaffold(scan, flows, plan, tmp);
+
+  // entry
+  const entry = fs.readFileSync(path.join(tmp, 'AGENTS.md'), 'utf8');
+  assert.ok(entry.startsWith('---'), 'entry starts with frontmatter');
+  assert.ok(/kind: entry/.test(entry) && /razor_format:/.test(entry), 'entry header fields');
+
+  // a doc
+  const overview = fs.readFileSync(path.join(tmp, 'overview.md'), 'utf8');
+  assert.ok(overview.startsWith('---'), 'doc starts with frontmatter');
+  assert.ok(/kind: doc/.test(overview) && /version: 1/.test(overview) && /generated: \d{4}-\d{2}-\d{2}/.test(overview),
+    'doc header has kind/version/generated');
+
+  // a skill
+  const skill = fs.readFileSync(path.join(tmp, 'skills', plan.skills[0].name, 'SKILL.md'), 'utf8');
+  assert.ok(/kind: skill/.test(skill) && /version:/.test(skill) && /razor_format:/.test(skill),
+    'skill header has kind/version/razor_format');
+  fs.rmSync(tmp, { recursive: true, force: true });
+});
+
 test('complex skill (db-migrations) also emits a reference.md', () => {
   const { emitScaffold } = require('../emitter.js');
   const scan = {
@@ -256,7 +284,66 @@ test('complex skill (db-migrations) also emits a reference.md', () => {
   fs.rmSync(tmp, { recursive: true, force: true });
 });
 
-// ---- enricher (no network needed) -----------------------------------------
+test('scaffold emits a routing manifest mapping skills to triggers', () => {
+  const { scanRepo } = require('../scanner.js');
+  const { emitScaffold } = require('../emitter.js');
+  const scan = scanRepo(NODE_FIXTURE);
+  const flows = detectWorkflows(NODE_FIXTURE);
+  const plan = planScaffold(scan, flows);
+
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'razor-route-'));
+  emitScaffold(scan, flows, plan, tmp);
+
+  const manifestPath = path.join(tmp, 'skills.index.json');
+  assert.ok(fs.existsSync(manifestPath), 'manifest written when skills exist');
+  const m = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+  assert.ok(Array.isArray(m.skills) && m.skills.length === plan.skills.length, 'one entry per skill');
+  const rt = m.skills.find((s) => s.name === 'run-tests');
+  assert.ok(rt, 'run-tests present in manifest');
+  assert.ok(rt.triggers.includes('test'), 'run-tests has a test trigger');
+  assert.ok(rt.path.endsWith('run-tests/SKILL.md'), 'manifest records the skill path');
+  fs.rmSync(tmp, { recursive: true, force: true });
+});
+
+test('knownSkillNames lists the full catalog', () => {
+  const { knownSkillNames } = require('../planner.js');
+  const names = knownSkillNames();
+  for (const expected of ['run-tests', 'lint-fix', 'code-push', 'db-migrations', 'local-env', 'build']) {
+    assert.ok(names.includes(expected), `catalog includes ${expected}`);
+  }
+});
+
+test('buildRequestedSkill returns a grounded skill when evidence exists', () => {
+  const { buildRequestedSkill } = require('../planner.js');
+  const scan = { testing: 'Jest', orm: 'unknown', scripts: { test: 'jest' }, evidence: { testing: 'pkg: jest' } };
+  const flows = { evidence: {} };
+  const res = buildRequestedSkill('run-tests', scan, flows);
+  assert.equal(res.verified, true);
+  assert.equal(res.skill.name, 'run-tests');
+  assert.ok(res.skill.evidence, 'grounded skill keeps evidence');
+});
+
+test('buildRequestedSkill marks a known skill unverified when evidence is missing', () => {
+  const { buildRequestedSkill } = require('../planner.js');
+  const scan = { testing: 'unknown', orm: 'unknown', scripts: {}, evidence: {} };
+  const flows = { hasMigrations: false, evidence: {} };
+  const res = buildRequestedSkill('db-migrations', scan, flows);
+  assert.equal(res.verified, false);
+  assert.equal(res.skill.verified, false);
+});
+
+test('buildRequestedSkill returns null for an unknown skill name', () => {
+  const { buildRequestedSkill } = require('../planner.js');
+  const res = buildRequestedSkill('not-a-real-skill', { evidence: {} }, { evidence: {} });
+  assert.equal(res, null);
+});
+
+test('an unverified skill renders a loud warning in its SKILL.md', () => {
+  const { renderSkillFile } = require('../emitter.js');
+  const md = renderSkillFile({ name: 'db-migrations', intent: 'x', verified: false }, {});
+  assert.ok(/UNVERIFIED/i.test(md), 'frontmatter flags unverified');
+  assert.ok(/Unverified/i.test(md), 'body warns it is unverified');
+});
 
 test('enrichDocs is a no-op passthrough when there is no API key', async () => {
   const { enrichDocs } = require('../enricher.js');
