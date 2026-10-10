@@ -42,6 +42,13 @@ Get a free Gemini key at https://aistudio.google.com/apikey
   - `-t target` — output layout: `agents-md` (default), `kiro`, or `claude`.
   - `--offline` — skip the LLM pass, deterministic output only.
   - `-m model` — Gemini model for the prose-enrichment pass.
+- `node index.js add-skill <skill> [dir]` — re-scan the repo and add a named
+  skill into an existing pack.
+  - Known skills: `run-tests`, `lint-fix`, `code-push`, `db-migrations`,
+    `local-env`, `build`.
+  - If the repo has evidence for the skill it is grounded; if not, it is still
+    generated but clearly marked **UNVERIFIED**.
+  - Regenerates `skills.index.json` so the new skill is routable.
 
 ## The context pack (scaffold)
 
@@ -67,7 +74,24 @@ files; a full backend gets the lot. Every file and skill is grounded in evidence
 
 Skills are chosen from the scan: `run-tests` only if a test runner exists,
 `code-push` only with a git remote, `db-migrations` only with an ORM **and** a
-migrations dir, `local-env` only with Docker, `lint-fix` only with a linter.
+migrations dir, `local-env` only with Docker, `lint-fix` only with a linter,
+`build` only with a build system (Bazel/Cargo/Go/Maven/Gradle/CMake/Make).
+
+### Standard headers and versioning
+
+Every generated file starts with YAML frontmatter — `name`, `kind`,
+`description`, `version`, `generated` date, `razor_format`, and `evidence` on
+skills — so packs diff cleanly and are easy to search and version.
+
+### Routing manifest
+
+Packs with skills also emit `skills.index.json`: a machine-readable map of each
+skill's description, path, and **trigger keywords**, so a coding agent can route
+a task to the right skill without loading every `SKILL.md`. Triggers are derived
+automatically from each skill's own data (name, intent, command, framework),
+and the manifest is regenerated on every `scaffold` and `add-skill`, so it never
+drifts from the skills on disk. Razor emits the manifest; the actual loading is
+done by the consuming agent at runtime.
 
 ### Targets (which agent tool consumes it)
 
