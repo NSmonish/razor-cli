@@ -142,12 +142,17 @@ function detectPython(root, files, ev) {
   else ev.language = 'has .py files';
 
   const has = (n) => text.includes(n);
+  // word-boundary match so a stray substring (e.g. "flask" inside a doc extra)
+  // doesn't win. used for framework names where precision matters.
+  const hasWord = (n) => new RegExp(`(^|[^a-z0-9_])${n}([^a-z0-9_]|$)`).test(text);
   const where = reqFiles[0] || 'deps';
 
+  // order: most specific / least ambiguous first. fastapi before flask because
+  // fastapi projects sometimes mention flask in extras; django is distinct.
   let framework = 'unknown';
-  if (has('django')) { framework = 'Django'; ev.framework = `${where}: django`; }
-  else if (has('flask')) { framework = 'Flask'; ev.framework = `${where}: flask`; }
-  else if (has('fastapi')) { framework = 'FastAPI'; ev.framework = `${where}: fastapi`; }
+  if (hasWord('django')) { framework = 'Django'; ev.framework = `${where}: django`; }
+  else if (hasWord('fastapi')) { framework = 'FastAPI'; ev.framework = `${where}: fastapi`; }
+  else if (hasWord('flask')) { framework = 'Flask'; ev.framework = `${where}: flask`; }
 
   let testing = 'unknown';
   if (has('pytest')) { testing = 'PyTest'; ev.testing = `${where}: pytest`; }
@@ -282,6 +287,25 @@ function scanRepo(dir) {
 
   let stack = detectNode(root, files, ev);
   if (!stack) stack = detectPython(root, files, ev);
+
+  // precedence fix: some Python projects carry JS tooling at the root
+  // (package.json + Gruntfile, docs builders, etc). detectNode fires on that
+  // package.json but finds no real framework. if there are strong Python
+  // signals (pyproject/setup.py and lots of .py files), prefer Python so we
+  // don't mislabel e.g. Django as "JavaScript".
+  if (stack && stack.language !== 'Python' && stack.framework === 'unknown') {
+    const hasPyManifest = ['pyproject.toml', 'setup.py', 'requirements.txt', 'Pipfile']
+      .some((f) => files.includes(f));
+    const pyCount = files.filter((f) => f.endsWith('.py')).length;
+    if (hasPyManifest && pyCount >= 5) {
+      const pyEv = {};
+      const py = detectPython(root, files, pyEv);
+      if (py && (py.framework !== 'unknown' || py.testing !== 'unknown')) {
+        stack = py;
+        Object.assign(ev, pyEv);
+      }
+    }
+  }
 
   // nothing at root — look one level down for a package.json / python project
   // (common for monorepos: frontend/, backend/, client/, server/, api/)

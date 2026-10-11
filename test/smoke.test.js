@@ -49,6 +49,29 @@ test('scanRepo throws on a path that is not a directory', () => {
   assert.throws(() => scanRepo(path.join(__dirname, 'does-not-exist')));
 });
 
+test('fastapi is not mislabeled as Flask (word-boundary + order)', () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'razor-fa-'));
+  // a pyproject that names fastapi but also mentions flask in an extra
+  fs.writeFileSync(path.join(tmp, 'pyproject.toml'),
+    'name = "fastapi"\ndependencies = ["fastapi", "starlette"]\n# note: not flask\n');
+  fs.writeFileSync(path.join(tmp, 'main.py'), 'from fastapi import FastAPI\n');
+  const d = scanRepo(tmp);
+  assert.equal(d.framework, 'FastAPI');
+  fs.rmSync(tmp, { recursive: true, force: true });
+});
+
+test('a python project with root JS tooling is still labeled Python', () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'razor-pyjs-'));
+  // JS tooling at root (like Django's Gruntfile) + strong python signals
+  fs.writeFileSync(path.join(tmp, 'package.json'), '{"name":"x","devDependencies":{"grunt":"1"}}');
+  fs.writeFileSync(path.join(tmp, 'pyproject.toml'), 'name = "django"\ndependencies = ["django"]\n');
+  for (let i = 0; i < 6; i++) fs.writeFileSync(path.join(tmp, `mod${i}.py`), 'x = 1\n');
+  const d = scanRepo(tmp);
+  assert.equal(d.language, 'Python');
+  assert.equal(d.framework, 'Django');
+  fs.rmSync(tmp, { recursive: true, force: true });
+});
+
 test('razor init auto-scans a directory in mock mode', () => {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'razor-scan-'));
   const output = path.join(tmp, 'AGENTS.md');
