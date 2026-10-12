@@ -96,3 +96,27 @@ were correct and nothing was fabricated. By a looser "did it produce a usable,
 grounded pack with correct build/test commands" criterion, 19/20 would pass
 (only #11 realworld gives actively misleading output). We report the strict
 number to stay honest.
+
+## LLM-enrichment spot-check (separate from the 20-case eval)
+
+The 20-case eval ran `--offline` (deterministic) on purpose, so the pass rate
+measures the scanner/planner/emitter, not the optional LLM prose pass. The LLM
+pass only rewrites the wording of 4 prose docs (overview/architecture/workflows/
+steering); it never changes detected stack, commands, or skill selection.
+
+To check the LLM pass doesn't corrupt grounded facts, we ran it on 4 of the
+repos WITH the LLM (Flask, nodejs-testing-best-practices, requests, NestJS) and
+diffed against the offline output:
+
+- **All grounded commands/dependencies/paths preserved** — every backticked fact
+  from the deterministic version (e.g. `jest`, `eslint .`, `make test`,
+  `vitest run`, full dep lists, test paths) appeared in the enriched docs.
+- **Stack labels unchanged** — Flask stayed Flask, Sequelize stayed Sequelize,
+  TypeORM stayed TypeORM; the LLM did not alter any detected fact.
+- **No invention observed** — e.g. the requests overview correctly stayed
+  Python/PyTest and did not fabricate a framework or database (requests has
+  neither).
+
+Conclusion: on these 4 repos the LLM pass preserved facts and added nothing
+ungrounded. This is a spot-check, not a full eval of the LLM path — a larger,
+systematic fact-preservation eval of the LLM pass is still future work.
