@@ -52,13 +52,15 @@ the criterion afterward. No manual editing of any generated pack.
 
 ## Pass rate
 
-**Initial run (commit a84e1ee): 16/20 = 80%.** The run surfaced two real detector
-bugs (#6 fastapi mislabeled Flask, #9 django mislabeled JavaScript). Both were
-fixed and re-verified the same day, with regression tests added.
+**Initial run (commit a84e1ee): 17/20 = 85%.** The run surfaced two real detector
+bugs — #6 fastapi mislabeled Flask and #9 django mislabeled JavaScript — plus one
+genuine miss, #11 realworld. Both bugs were fixed and re-verified the same day,
+with regression tests added.
 
-**After fixes: 18/20 = 90%.** Remaining failure: #11 realworld (ungrounded guess
-on a meta/spec repo). #13 is a borderline PASS (accurate but thin on a docs-only
-repo).
+**After fixes: 19/20 = 95%.** The one remaining failure is #11 realworld (an
+ungrounded guess on a meta/spec repo). Note #13 (fastapi-best-practices) is a
+*borderline* pass — accurate (nothing invented) but a thin, unhelpful pack
+because the repo is docs-only; count it as a fail and the rate is 18/20 = 90%.
 
 ## Honest analysis of the remaining failure
 
