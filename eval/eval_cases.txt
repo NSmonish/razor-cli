@@ -1,0 +1,22 @@
+# Razor launch-eval cases: 20 real, popular, production-grade repos.
+# format:  <name> <git-url>   (lines starting with # are ignored)
+01-is https://github.com/sindresorhus/is
+02-lodash https://github.com/lodash/lodash
+03-requests https://github.com/psf/requests
+04-click https://github.com/pallets/click
+05-flask https://github.com/pallets/flask
+06-fastapi https://github.com/tiangolo/fastapi
+07-express https://github.com/expressjs/express
+08-fastify https://github.com/fastify/fastify
+09-django https://github.com/django/django
+10-nest https://github.com/nestjs/nest
+11-realworld https://github.com/gothinkster/realworld
+12-node-tbp https://github.com/goldbergyoni/nodejs-testing-best-practices
+13-fastapi-bp https://github.com/zhanymkanov/fastapi-best-practices
+14-prisma-ex https://github.com/prisma/prisma-examples
+15-pytorch https://github.com/pytorch/pytorch
+16-tensorflow https://github.com/tensorflow/tensorflow
+17-dmlab https://github.com/google-deepmind/lab
+18-k8s https://github.com/kubernetes/kubernetes
+19-ripgrep https://github.com/BurntSushi/ripgrep
+20-grpc https://github.com/grpc/grpc

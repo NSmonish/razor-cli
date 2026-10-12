@@ -1,0 +1,66 @@
+{
+  "language": "TypeScript",
+  "framework": "Express.js",
+  "testing": "Jest",
+  "orm": "Sequelize",
+  "routes_folder": "unknown",
+  "package_manager": "npm",
+  "entry_point": "unknown",
+  "scripts": {
+    "test": "jest",
+    "lint": "eslint ."
+  },
+  "key_dependencies": [
+    "@aws-sdk/client-sqs",
+    "@nestjs/common",
+    "@nestjs/core",
+    "@nestjs/platform-express",
+    "@pulumi/pulumi",
+    "@pulumi/rabbitmq",
+    "@types/amqplib",
+    "@types/aws-sdk",
+    "@types/jsonwebtoken",
+    "amqplib",
+    "axios",
+    "axios-retry",
+    "body-parser",
+    "express",
+    "jsonwebtoken",
+    "pg",
+    "reflect-metadata",
+    "rxjs",
+    "sequelize"
+  ],
+  "env_vars": [],
+  "structure": [
+    "recipes/",
+    "graphics/",
+    "example-application/",
+    "anti-patterns/"
+  ],
+  "readme_summary": "A detailed guide to modern testing with Node.js",
+  "test_locations": [
+    "recipes/nestjs/test",
+    "recipes/mocha",
+    "recipes/friendly-structure-for-reporting",
+    "recipes/doc-driven-contract-test/test",
+    "example-application/test",
+    "example-application/test/setup",
+    "anti-patterns"
+  ],
+  "config_files": [
+    "jest.config.js",
+    "tsconfig.json",
+    "recipes/nestjs/tsconfig.json",
+    "recipes/friendly-structure-for-reporting/jest.config.js",
+    "example-application/test/setup/docker-compose.yml"
+  ],
+  "sub_projects": [],
+  "file_count": 90,
+  "evidence": {
+    "language": "package.json",
+    "framework": "example-application/libraries/types.ts (imports express)",
+    "testing": "package.json dep: jest",
+    "orm": "package.json dep: sequelize"
+  }
+}

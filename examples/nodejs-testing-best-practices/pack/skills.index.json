@@ -1,0 +1,69 @@
+{
+  "razor_format": "1.0",
+  "generated": "2026-10-12",
+  "entry": "AGENTS.md",
+  "skills": [
+    {
+      "name": "run-tests",
+      "description": "Run the test suite (Jest). Use when verifying changes or before pushing.",
+      "path": "skills/run-tests/SKILL.md",
+      "triggers": [
+        "run",
+        "tests",
+        "test",
+        "jest",
+        "verifying",
+        "changes",
+        "pushing.",
+        "failing test",
+        "unit test",
+        "spec",
+        "verify"
+      ],
+      "evidence": "package.json dep: jest",
+      "verified": true
+    },
+    {
+      "name": "lint-fix",
+      "description": "Lint and auto-fix code style. Use before committing to keep CI green.",
+      "path": "skills/lint-fix/SKILL.md",
+      "triggers": [
+        "lint",
+        "fix",
+        "auto-fix",
+        "code",
+        "style",
+        "style.",
+        "committing",
+        "keep",
+        "green.",
+        "eslint",
+        "format",
+        "formatting"
+      ],
+      "evidence": ".prettierrc.json",
+      "verified": true
+    },
+    {
+      "name": "code-push",
+      "description": "Verify then push changes to the remote. Use when the user asks to commit/push/open a PR.",
+      "path": "skills/code-push/SKILL.md",
+      "triggers": [
+        "code",
+        "push",
+        "verify",
+        "changes",
+        "remote.",
+        "user",
+        "asks",
+        "commit",
+        "open",
+        "pr.",
+        "pull request",
+        "pr"
+      ],
+      "evidence": ".git/config has a remote; .github/workflows/",
+      "verified": true
+    }
+  ]
+}
