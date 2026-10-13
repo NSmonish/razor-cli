@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<testsuites>
+	<testcase name="send trailers when payload is empty string" time="0.038445" classname="test"/>
+	<testcase name="send trailers when payload is empty buffer" time="0.003073" classname="test"/>
+	<testcase name="send trailers when payload is undefined" time="0.001873" classname="test"/>
+	<testcase name="send trailers when payload is json" time="0.001466" classname="test"/>
+	<testcase name="send trailers when payload is stream" time="0.002080" classname="test"/>
+	<testcase name="remove trailer while stream is being consumed" time="0.001739" classname="test"/>
+	<testcase name="send trailers when using async-await" time="0.002342" classname="test"/>
+	<testcase name="error in trailers should be ignored" time="0.001092" classname="test"/>
+	<testcase name="send is called once when multiple trailer callbacks run synchronously" time="0.003213" classname="test"/>
+	<testsuite name="trailer handler counter" time="1.042896" disabled="0" errors="0" tests="3" failures="0" skipped="0" hostname="Sungjoons-MacBook-Pro-7.local">
+		<testcase name="callback with timeout" time="0.504949" classname="test"/>
+		<testcase name="async-await" time="0.517666" classname="test"/>
+		<testcase name="mixed callback and promise trailers only use the first completion" time="0.018351" classname="test"/>
+	</testsuite>
+	<testcase name="removeTrailer" time="0.008104" classname="test"/>
+	<testcase name="remove all trailers" time="0.005649" classname="test"/>
+	<testcase name="remove some trailers should keep trailer mode for the remaining ones" time="0.003055" classname="test"/>
+	<testcase name="remove all trailers should behave like no trailers were registered" time="0.002437" classname="test"/>
+	<testcase name="hasTrailer" time="0.002109" classname="test"/>
+	<testcase name="throw error when trailer header name is not allowed" time="0.002189" classname="test"/>
+	<testcase name="throw error when trailer header value is not function" time="0.000993" classname="test"/>
+	<!-- tests 19 -->
+	<!-- suites 1 -->
+	<!-- pass 19 -->
+	<!-- fail 0 -->
+	<!-- cancelled 0 -->
+	<!-- skipped 0 -->
+	<!-- todo 0 -->
+	<!-- duration_ms 1207.223791 -->
+</testsuites>

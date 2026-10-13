@@ -1,0 +1,222 @@
+diff --git a/lib/validation.js b/lib/validation.js
+index 891c17e..f202087 100644
+--- a/lib/validation.js
++++ b/lib/validation.js
+@@ -13,7 +13,76 @@ const {
+   FST_ERR_SCH_RESPONSE_SCHEMA_NOT_NESTED_2XX
+ } = require('./errors')
+ 
+-const { FSTWRN001 } = require('./warnings')
++const { FSTWRN001, FSTSEC002 } = require('./warnings')
++
++const lowerCaseList = list => Array.isArray(list) ? list.map(h => typeof h === 'string' ? h.toLowerCase() : h) : list
++const isObject = v => v !== null && typeof v === 'object' && !Array.isArray(v)
++
++// keywords whose value is a single subschema
++const schemaKeywords = ['not', 'if', 'then', 'else', 'items', 'additionalItems', 'additionalProperties',
++  'unevaluatedProperties', 'unevaluatedItems', 'contains', 'propertyNames']
++// keywords whose value is an array of subschemas
++const schemaArrayKeywords = ['allOf', 'anyOf', 'oneOf', 'prefixItems', 'items']
++// keywords whose value is a map of name -> subschema, names are kept as is
++const schemaMapKeywords = ['definitions', '$defs', 'patternProperties']
++
++// Returns a copy of the headers schema where every header name is lowercased,
++// since node lowercases incoming header names. The original is not mutated.
++function lowerCaseHeadersSchema (root, method, url) {
++  const rootId = typeof root.$id === 'string' ? root.$id.replace(/#$/, '') : null
++  const seen = new WeakMap()
++
++  function isLocalRef (ref) {
++    const base = ref.split('#')[0]
++    return base === '' || (rootId !== null && base === rootId)
++  }
++
++  function walk (schema) {
++    if (!isObject(schema)) return schema
++    if (seen.has(schema)) return seen.get(schema)
++    const out = {}
++    seen.set(schema, out)
++    for (const key of Object.keys(schema)) out[key] = schema[key]
++
++    if (typeof schema.$ref === 'string' && !isLocalRef(schema.$ref)) {
++      FSTSEC002(method, url, schema.$ref)
++    }
++
++    if (Array.isArray(schema.required)) out.required = lowerCaseList(schema.required)
++
++    if (isObject(schema.properties)) {
++      out.properties = {}
++      for (const k of Object.keys(schema.properties)) {
++        out.properties[k.toLowerCase()] = walk(schema.properties[k])
++      }
++    }
++
++    for (const kw of ['dependencies', 'dependentSchemas', 'dependentRequired']) {
++      if (!isObject(schema[kw])) continue
++      out[kw] = {}
++      for (const k of Object.keys(schema[kw])) {
++        const v = schema[kw][k]
++        out[kw][k.toLowerCase()] = Array.isArray(v) ? lowerCaseList(v) : walk(v)
++      }
++    }
++
++    for (const kw of schemaMapKeywords) {
++      if (!isObject(schema[kw])) continue
++      out[kw] = {}
++      for (const k of Object.keys(schema[kw])) out[kw][k] = walk(schema[kw][k])
++    }
++
++    for (const kw of schemaKeywords) {
++      if (isObject(schema[kw])) out[kw] = walk(schema[kw])
++    }
++    for (const kw of schemaArrayKeywords) {
++      if (Array.isArray(schema[kw])) out[kw] = schema[kw].map(walk)
++    }
++    return out
++  }
++
++  return walk(root)
++}
+ 
+ function compileSchemasForSerialization (context, compile) {
+   if (!context.schema || !context.schema.response) {
+@@ -70,17 +139,7 @@ function compileSchemasForValidation (context, compile, isCustom) {
+   } else if (headers) {
+     // The header keys are case insensitive
+     //  https://datatracker.ietf.org/doc/html/rfc2616#section-4.2
+-    const headersSchemaLowerCase = {}
+-    Object.keys(headers).forEach(k => { headersSchemaLowerCase[k] = headers[k] })
+-    if (headersSchemaLowerCase.required instanceof Array) {
+-      headersSchemaLowerCase.required = headersSchemaLowerCase.required.map(h => h.toLowerCase())
+-    }
+-    if (headers.properties) {
+-      headersSchemaLowerCase.properties = {}
+-      Object.keys(headers.properties).forEach(k => {
+-        headersSchemaLowerCase.properties[k.toLowerCase()] = headers.properties[k]
+-      })
+-    }
++    const headersSchemaLowerCase = lowerCaseHeadersSchema(headers, method, url)
+     context[headersSchema] = compile({ schema: headersSchemaLowerCase, method, url, httpPart: 'headers' })
+   } else if (Object.hasOwn(schema, 'headers')) {
+     FSTWRN001('headers', method, url)
+diff --git a/lib/warnings.js b/lib/warnings.js
+index 7cd9e77..9948618 100644
+--- a/lib/warnings.js
++++ b/lib/warnings.js
+@@ -6,6 +6,7 @@ const { createWarning } = require('process-warning')
+  * Warning codes:
+  *   - FSTWRN001
+  *   - FSTSEC001
++ *   - FSTSEC002
+  *
+  * Deprecation Codes FSTDEP001 - FSTDEP021 were used by v4 and MUST NOT be reused.
+  *                             - FSTDEP022 - FSTDEP025 are used by v5 and MUST NOT be reused.
+@@ -33,8 +34,16 @@ const FSTSEC001 = createWarning({
+   unlimited: true
+ })
+ 
++const FSTSEC002 = createWarning({
++  name: 'FastifySecurity',
++  code: 'FSTSEC002',
++  message: 'The headers schema for %s %s uses the external $ref "%s", whose header names cannot be lowercased. Header names are lowercased by Node.js, so properties, required, and dependencies of the referenced schema must be written in lowercase.',
++  unlimited: true
++})
++
+ module.exports = {
+   FSTWRN001,
+   FSTWRN003,
+-  FSTSEC001
++  FSTSEC001,
++  FSTSEC002
+ }
+diff --git a/test/headers-case.test.js b/test/headers-case.test.js
+new file mode 100644
+index 0000000..2e0f719
+--- /dev/null
++++ b/test/headers-case.test.js
+@@ -0,0 +1,85 @@
++'use strict'
++
++const { test } = require('node:test')
++const { spyWarning } = require('process-warning')
++const Fastify = require('..')
++const dependentRequired = require('ajv/dist/vocabularies/validation/dependentRequired').default
++const dependentSchemas = require('ajv/dist/vocabularies/applicator/dependentSchemas').default
++
++// draft-07 Ajv does not know the 2019 dependent* keywords out of the box
++const plugin = ajv => {
++  ajv.addKeyword(dependentRequired)
++  ajv.addKeyword(dependentSchemas)
++}
++const { FSTSEC002 } = require('../lib/warnings')
++
++async function status (schema, headers, addSchemas = []) {
++  const fastify = Fastify({ ajv: { plugins: [plugin], customOptions: { strictTypes: false } } })
++  for (const s of addSchemas) fastify.addSchema(s)
++  fastify.get('/', { schema: { headers: schema } }, async () => 'ok')
++  const res = await fastify.inject({ url: '/', headers })
++  await fastify.close()
++  return res.statusCode
++}
++
++const cases = {
++  dependencies: {
++    type: 'object',
++    properties: { 'X-Admin': { const: 'true' }, 'X-Admin-Token': { const: 'secret' } },
++    dependencies: { 'X-Admin': ['X-Admin-Token'] }
++  },
++  dependencySubschema: {
++    type: 'object',
++    properties: { 'X-Admin': { const: 'true' }, 'X-Admin-Token': { const: 'secret' } },
++    dependencies: { 'X-Admin': { required: ['X-Admin-Token'] } }
++  },
++  dependentRequired: {
++    type: 'object',
++    properties: { 'X-Admin': { const: 'true' }, 'X-Admin-Token': { const: 'secret' } },
++    dependentRequired: { 'X-Admin': ['X-Admin-Token'] }
++  },
++  dependentSchemas: {
++    type: 'object',
++    properties: { 'X-Admin': { const: 'true' } },
++    dependentSchemas: { 'X-Admin': { required: ['X-Admin-Token'], properties: { 'X-Admin-Token': { const: 'secret' } } } }
++  },
++  nested: {
++    type: 'object',
++    properties: { 'X-Admin': { const: 'true' } },
++    allOf: [{ properties: { 'X-Admin-Token': { const: 'secret' } } }, { if: { required: ['X-Admin'] }, then: { required: ['X-Admin-Token'] } }]
++  },
++  localRef: {
++    type: 'object',
++    properties: { 'X-Admin': { const: 'true' } },
++    allOf: [{ $ref: '#/definitions/tok' }],
++    definitions: { tok: { required: ['X-Admin-Token'], properties: { 'X-Admin-Token': { const: 'secret' } } } },
++    dependencies: { 'X-Admin': ['X-Admin-Token'] }
++  }
++}
++
++for (const [name, schema] of Object.entries(cases)) {
++  test(`canonical-case schema enforced: ${name}`, async t => {
++    t.assert.strictEqual(await status(schema, { 'X-Admin': 'true' }), 400)
++    t.assert.strictEqual(await status(schema, { 'X-Admin': 'true', 'X-Admin-Token': 'bad' }), 400)
++    t.assert.strictEqual(await status(schema, { 'X-Admin': 'true', 'X-Admin-Token': 'secret' }), 200)
++  })
++}
++
++test('schema is not mutated', async t => {
++  const schema = JSON.parse(JSON.stringify(cases.localRef))
++  const copy = JSON.parse(JSON.stringify(schema))
++  await status(schema, {})
++  t.assert.deepStrictEqual(schema, copy)
++})
++
++test('external $ref emits FSTSEC002, inline and local do not', async t => {
++  const spy = spyWarning(FSTSEC002)
++  t.after(spy.restore)
++  const shared = { $id: 'http://example.com/admin-headers', type: 'object', properties: { 'x-a': { type: 'string' } } }
++
++  await status({ type: 'object', properties: { a: { type: 'string' } }, definitions: { d: {} }, allOf: [{ $ref: '#/definitions/d' }] }, {})
++  t.assert.strictEqual(spy.callCount(), 0)
++
++  await status({ $ref: 'http://example.com/admin-headers#' }, {}, [shared])
++  t.assert.deepStrictEqual(spy.calls.filter(c => c.arguments[0] === 'GET'), [{ arguments: ['GET', '/', 'http://example.com/admin-headers#'], result: true }])
++})

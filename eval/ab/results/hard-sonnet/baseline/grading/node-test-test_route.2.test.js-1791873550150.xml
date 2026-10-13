@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<testsuites>
+	<testcase name="same route definition object on multiple prefixes" time="0.031736" classname="test"/>
+	<testcase name="path can be specified in place of uri" time="0.009481" classname="test"/>
+	<testcase name="invalid bodyLimit option - route" time="0.001098" classname="test"/>
+	<testcase name="handler function in options of shorthand route should works correctly" time="0.001665" classname="test"/>
+	<!-- tests 4 -->
+	<!-- suites 0 -->
+	<!-- pass 4 -->
+	<!-- fail 0 -->
+	<!-- cancelled 0 -->
+	<!-- skipped 0 -->
+	<!-- todo 0 -->
+	<!-- duration_ms 120.048708 -->
+</testsuites>

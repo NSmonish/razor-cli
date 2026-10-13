@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<testsuites>
+	<testcase name="trust proxy, not add properties to node req" time="0.057634" classname="test"/>
+	<testcase name="trust proxy chain" time="0.007807" classname="test"/>
+	<testcase name="trust proxy function" time="0.005892" classname="test"/>
+	<testcase name="trust proxy number" time="0.005369" classname="test"/>
+	<testcase name="trust proxy IP addresses" time="0.003990" classname="test"/>
+	<testcase name="trust proxy protocol" time="0.006816" classname="test"/>
+	<testcase name="trust proxy ignores forwarded headers from untrusted connections" time="0.003883" classname="test"/>
+	<testcase name="trust proxy reads forwarded headers from trusted connections" time="0.003737" classname="test"/>
+	<testcase name="trust proxy with number and undefined socket remoteAddress" time="0.000276" classname="test"/>
+	<testcase name="trust proxy with number and null socket remoteAddress" time="0.000191" classname="test"/>
+	<!-- tests 10 -->
+	<!-- suites 0 -->
+	<!-- pass 10 -->
+	<!-- fail 0 -->
+	<!-- cancelled 0 -->
+	<!-- skipped 0 -->
+	<!-- todo 0 -->
+	<!-- duration_ms 190.611584 -->
+</testsuites>

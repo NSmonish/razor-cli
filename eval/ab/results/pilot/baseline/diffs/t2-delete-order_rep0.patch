@@ -1,0 +1,143 @@
+diff --git a/example-application/entry-points/api.ts b/example-application/entry-points/api.ts
+index 4ecc904..3b40d63 100644
+--- a/example-application/entry-points/api.ts
++++ b/example-application/entry-points/api.ts
+@@ -77,6 +77,17 @@ const defineRoutes = (expressApp: express.Application) => {
+     res.json(response);
+   });
+ 
++  // delete existing order by id
++  router.delete('/:id', async (req, res, next) => {
++    try {
++      console.log(`Order API was called to delete order ${req.params.id}`);
++      await orderService.deleteOrder(req.params.id);
++      res.status(204).end();
++    } catch (error) {
++      next(error);
++    }
++  });
++
+   expressApp.use('/order', router);
+ 
+   expressApp.use(
+diff --git a/example-application/openapi.json b/example-application/openapi.json
+index 4dd4a36..2f3eea8 100644
+--- a/example-application/openapi.json
++++ b/example-application/openapi.json
+@@ -51,6 +51,28 @@
+             "content": {}
+           }
+         }
++      },
++      "delete": {
++        "summary": "Delete an Order by ID",
++        "description": "Deletes a single order",
++        "operationId": "deleteOrderById",
++        "parameters": [
++          {
++            "name": "orderId",
++            "in": "path",
++            "description": "ID of order to delete",
++            "required": true,
++            "schema": {
++              "type": "integer"
++            }
++          }
++        ],
++        "responses": {
++          "204": {
++            "description": "Order deleted",
++            "content": {}
++          }
++        }
+       }
+     },
+     "/order": {
+diff --git a/example-application/test/deleteOrder.test.ts b/example-application/test/deleteOrder.test.ts
+new file mode 100644
+index 0000000..3102c76
+--- /dev/null
++++ b/example-application/test/deleteOrder.test.ts
+@@ -0,0 +1,82 @@
++import { buildOrder } from './order-data-factory';
++import { testSetup } from './setup/test-file-setup';
++
++beforeAll(async () => {
++  await testSetup.start({
++    startAPI: true,
++    disableNetConnect: true,
++    includeTokenInHttpClient: true,
++    mockGetUserCalls: true,
++    mockMailerCalls: true,
++  });
++});
++
++beforeEach(() => {
++  testSetup.resetBeforeEach();
++});
++
++afterAll(async () => {
++  testSetup.tearDownTestFile();
++});
++
++describe('DELETE /order/:id', () => {
++  test('When deleting an existing order, Then should get back 204 with empty body', async () => {
++    //Arrange
++    const {
++      data: { id: orderId },
++    } = await testSetup.getHTTPClient().post('/order', buildOrder());
++
++    //Act
++    const deleteResponse = await testSetup
++      .getHTTPClient()
++      .delete(`/order/${orderId}`);
++
++    //Assert
++    expect(deleteResponse).toMatchObject({ status: 204, data: '' });
++  });
++
++  test('When deleting an existing order, Then it should no longer be retrievable', async () => {
++    //Arrange
++    const {
++      data: { id: orderId },
++    } = await testSetup.getHTTPClient().post('/order', buildOrder());
++
++    //Act
++    await testSetup.getHTTPClient().delete(`/order/${orderId}`);
++
++    //Assert
++    const getResponse = await testSetup
++      .getHTTPClient()
++      .get(`/order/${orderId}`);
++    expect(getResponse.status).toBe(404);
++  });
++
++  test('When deleting an order, Then other orders remain unaffected', async () => {
++    //Arrange
++    const {
++      data: { id: orderToDeleteId },
++    } = await testSetup.getHTTPClient().post('/order', buildOrder());
++    const orderToKeep = buildOrder({ isPremiumUser: false });
++    const {
++      data: { id: orderToKeepId },
++    } = await testSetup.getHTTPClient().post('/order', orderToKeep);
++
++    //Act
++    await testSetup.getHTTPClient().delete(`/order/${orderToDeleteId}`);
++
++    //Assert
++    const getResponse = await testSetup
++      .getHTTPClient()
++      .get(`/order/${orderToKeepId}`);
++    expect(getResponse).toMatchObject({
++      status: 200,
++      data: {
++        id: orderToKeepId,
++        externalIdentifier: orderToKeep.externalIdentifier,
++        userId: orderToKeep.userId,
++        productId: orderToKeep.productId,
++        totalPrice: orderToKeep.totalPrice,
++      },
++    });
++  });
++});

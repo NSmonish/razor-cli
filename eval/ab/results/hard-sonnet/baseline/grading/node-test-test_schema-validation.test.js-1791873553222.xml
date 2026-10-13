@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="utf-8"?>
+<testsuites>
+	<testcase name="Basic validation test" time="0.044201" classname="test"/>
+	<testcase name="Different schema per content type" time="0.015372" classname="test"/>
+	<testcase name="Skip validation if no schema for content type" time="0.007548" classname="test"/>
+	<testcase name="Skip validation if no content type schemas" time="0.001965" classname="test"/>
+	<testcase name="External AJV instance" time="0.016467" classname="test"/>
+	<testcase name="Encapsulation" time="0.009145" classname="test"/>
+	<testcase name="Triple $ref with a simple $id" time="0.008101" classname="test"/>
+	<testcase name="Extending schema" time="0.006802" classname="test"/>
+	<testcase name="Should work with nested ids" time="0.009797" classname="test"/>
+	<testcase name="Use the same schema across multiple routes" time="0.006490" classname="test"/>
+	<testcase name="JSON Schema validation keywords" time="0.006145" classname="test"/>
+	<testcase name="Nested id calls" time="0.005041" classname="test"/>
+	<testcase name="Use the same schema id in different places" time="0.005621" classname="test"/>
+	<testcase name="Use shared schema and $ref with $id ($ref to $id)" time="0.005749" classname="test"/>
+	<testcase name="Use items with $ref" time="0.005877" classname="test"/>
+	<testcase name="Use $ref to /definitions" time="0.006065" classname="test"/>
+	<testcase name="Custom AJV settings - pt1" time="0.005881" classname="test"/>
+	<testcase name="Custom AJV settings - pt2" time="0.004594" classname="test"/>
+	<testcase name="Custom AJV settings on different parameters - pt1" time="0.008330" classname="test"/>
+	<testcase name="Custom AJV settings on different parameters - pt2" time="0.005768" classname="test"/>
+	<testcase name="The same $id in route's schema must not overwrite others" time="0.007177" classname="test"/>
+	<testcase name="Custom validator compiler should not mutate schema" time="0.000780" classname="test"/>
+	<testcase name="Custom validator builder override by custom validator compiler" time="0.005270" classname="test"/>
+	<testcase name="Custom validator builder override by custom validator compiler in child instance" time="0.008221" classname="test"/>
+	<testcase name="Schema validation when no content type is provided" time="0.006021" classname="test"/>
+	<testcase name="Schema validation will not be bypass by different content type" time="0.045086" classname="test"/>
+	<testcase name="coercion of empty string to null with nullable types" time="0.005130" classname="test"/>
+	<testcase name="header schema dependencies with canonical-case names are enforced" time="0.007269" classname="test"/>
+	<testcase name="header schema dependencies: lowercase-equivalent schema behaves identically" time="0.005083" classname="test"/>
+	<testcase name="header schema dependencies are normalized in nested subschemas" time="0.004655" classname="test"/>
+	<testcase name="header schema dependencies are normalized in local $ref definitions" time="0.005064" classname="test"/>
+	<testcase name="header schema dependencies: subschema-form dependency values are normalized" time="0.006149" classname="test"/>
+	<testcase name="header schema lowercasing does not mutate the input schema" time="0.004198" classname="test"/>
+	<testcase name="header schema with an external $ref emits FSTSEC002 (case-normalization does not reach it)" time="0.005068" classname="test" failure="Expected values to be strictly deep-equal:+ actual - expected  [    'POST',    '/',+   'http://example.com/admin-headers'-   'http://example.com/admin-headers#'  ]">
+		<failure type="testCodeFailure" message="Expected values to be strictly deep-equal:+ actual - expected  [    'POST',    '/',+   'http://example.com/admin-headers'-   'http://example.com/admin-headers#'  ]">
+[Error [ERR_TEST_FAILURE]: Expected values to be strictly deep-equal:
++ actual - expected
+
+  [
+    'POST',
+    '/',
++   'http://example.com/admin-headers'
+-   'http://example.com/admin-headers#'
+  ]
+] {
+  code: 'ERR_TEST_FAILURE',
+  failureType: 'testCodeFailure',
+  cause: AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+    [
+      'POST',
+      '/',
+  +   'http://example.com/admin-headers'
+  -   'http://example.com/admin-headers#'
+    ]
+  
+      at assert.&lt;computed> [as deepStrictEqual] (node:internal/test_runner/test:320:18)
+      at TestContext.&lt;anonymous> (/private/tmp/razor-ab/runs/hard-sonnet/t7-fastify-header-case_rep1_1791873441242/naive/test/schema-validation.test.js:1884:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+      at async Test.run (node:internal/test_runner/test:1054:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:744:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: [ 'POST', '/', 'http://example.com/admin-headers' ],
+    expected: [ 'POST', '/', 'http://example.com/admin-headers#' ],
+    operator: 'deepStrictEqual'
+  }
+}
+		</failure>
+	</testcase>
+	<testcase name="inline and local $ref header schemas do not emit FSTSEC002" time="0.005413" classname="test"/>
+	<!-- tests 35 -->
+	<!-- suites 0 -->
+	<!-- pass 34 -->
+	<!-- fail 1 -->
+	<!-- cancelled 0 -->
+	<!-- skipped 0 -->
+	<!-- todo 0 -->
+	<!-- duration_ms 406.725083 -->
+</testsuites>

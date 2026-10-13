@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<testsuites>
+	<testcase name="Should honor ignoreTrailingSlash option" time="0.035896" classname="test"/>
+	<testcase name="Should honor ignoreDuplicateSlashes option" time="0.002909" classname="test"/>
+	<testcase name="Should honor ignoreTrailingSlash and ignoreDuplicateSlashes options" time="0.001975" classname="test"/>
+	<testcase name="Should honor maxParamLength option" time="0.001772" classname="test"/>
+	<testcase name="Should expose router options via getters on request and reply" time="0.019899" classname="test"/>
+	<testcase name="Should set is404 flag for unmatched paths" time="0.001341" classname="test"/>
+	<testcase name="Should honor frameworkErrors option - FST_ERR_BAD_URL" time="0.002778" classname="test"/>
+	<testcase name="Should supply Fastify request to the logger in frameworkErrors wrapper - FST_ERR_BAD_URL" time="0.007689" classname="test"/>
+	<testcase name="Should honor frameworkErrors option - FST_ERR_MAX_PARAM_LENGTH" time="0.001804" classname="test"/>
+	<testcase name="Should supply Fastify request to the logger in frameworkErrors wrapper - FST_ERR_MAX_PARAM_LENGTH" time="0.001618" classname="test"/>
+	<testcase name="Should honor frameworkErrors option - FST_ERR_ASYNC_CONSTRAINT" time="0.001337" classname="test"/>
+	<testcase name="Should supply Fastify request to the logger in frameworkErrors wrapper - FST_ERR_ASYNC_CONSTRAINT" time="0.001166" classname="test"/>
+	<testcase name="Should honor routerOptions.defaultRoute" time="0.000809" classname="test"/>
+	<testcase name="Should honor routerOptions.onBadUrl" time="0.001117" classname="test"/>
+	<testcase name="Should honor routerOptions.onMaxParamLength" time="0.000907" classname="test"/>
+	<testcase name="Should honor routerOptions.ignoreTrailingSlash" time="0.000948" classname="test"/>
+	<testcase name="Should honor routerOptions.ignoreDuplicateSlashes" time="0.001052" classname="test"/>
+	<testcase name="Should honor routerOptions.ignoreTrailingSlash and routerOptions.ignoreDuplicateSlashes" time="0.002683" classname="test"/>
+	<testcase name="Should honor routerOptions.maxParamLength" time="0.001037" classname="test"/>
+	<testcase name="Should honor routerOptions.allowUnsafeRegex" time="0.001050" classname="test"/>
+	<testcase name="Should honor routerOptions.caseSensitive" time="0.000844" classname="test"/>
+	<testcase name="Should honor routerOptions.queryStringParser" time="0.000804" classname="test"/>
+	<testcase name="Should honor routerOptions.useSemicolonDelimiter" time="0.000862" classname="test"/>
+	<testcase name="Should honor routerOptions.buildPrettyMeta" time="0.001761" classname="test"/>
+	<testcase name="Should honor routerOptions.queryStringParser over queryStringParser option" time="0.000829" classname="test"/>
+	<testcase name="Should support extra find-my-way options" time="0.000946" classname="test"/>
+	<testcase name="Should allow reusing a routerOptions object across instances" time="0.001069" classname="test"/>
+	<testcase name="Should not mutate user-provided routerOptions object" time="0.002190" classname="test"/>
+	<!-- tests 28 -->
+	<!-- suites 0 -->
+	<!-- pass 28 -->
+	<!-- fail 0 -->
+	<!-- cancelled 0 -->
+	<!-- skipped 0 -->
+	<!-- todo 0 -->
+	<!-- duration_ms 182.363 -->
+</testsuites>

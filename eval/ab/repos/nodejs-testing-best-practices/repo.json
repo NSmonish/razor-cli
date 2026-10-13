@@ -1,0 +1,10 @@
+{
+  "name": "nodejs-testing-best-practices",
+  "url": "https://github.com/goldbergyoni/nodejs-testing-best-practices",
+  "commit": "21178757151ffa91bc126150b2b2d079304730ef",
+  "install": [["npm", "ci", "--no-audit", "--no-fund"]],
+  "hooks": "hooks.sh",
+  "test_runner": "jest",
+  "test_paths": ["example-application/test"],
+  "test_timeout_s": 600
+}

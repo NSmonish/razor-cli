@@ -1,0 +1,28 @@
+diff --git a/example-application/business-logic/order-service.js b/example-application/business-logic/order-service.js
+index d77223f..f4c0e79 100644
+--- a/example-application/business-logic/order-service.js
++++ b/example-application/business-logic/order-service.js
+@@ -27,8 +27,13 @@ module.exports.addOrder = async function (newOrder) {
+     );
+   }
+ 
++  // premium users get 10% off, rounded up. Integer math avoids float error (e.g. 110 * 0.9)
++  const orderToSave = newOrder.isPremiumUser
++    ? { ...newOrder, totalPrice: Math.ceil((newOrder.totalPrice * 9) / 10) }
++    : newOrder;
++
+   // save to DB (Caution: simplistic code without layers and validation)
+-  const DBResponse = await new OrderRepository().addOrder(newOrder);
++  const DBResponse = await new OrderRepository().addOrder(orderToSave);
+ 
+   console.log('DBResponse', DBResponse);
+   if (process.env.SEND_MAILS === 'true') {
+@@ -43,7 +48,7 @@ module.exports.addOrder = async function (newOrder) {
+   await new MessageQueueClient().publish(
+     'order.events',
+     'order.events.new',
+-    newOrder,
++    orderToSave,
+   );
+ 
+   return DBResponse;

@@ -1,0 +1,87 @@
+diff --git a/lib/request.js b/lib/request.js
+index f1f4a5e..e4336e9 100644
+--- a/lib/request.js
++++ b/lib/request.js
+@@ -96,6 +96,15 @@ function getLastEntryInMultiHeaderValue (headerValue) {
+   return lastIndex === -1 ? headerValue.trim() : headerValue.slice(lastIndex + 1).trim()
+ }
+ 
++// Whether the direct peer of the connection is a proxy we trust.
++// A null proxyFn means `trustProxy: true`, i.e. trust everything.
++function isTrustedConnection (raw, proxyFn) {
++  if (proxyFn === null) return true
++  const addr = raw.socket?.remoteAddress
++  if (addr === undefined) return false
++  return Boolean(proxyFn(addr, 0))
++}
++
+ function buildRequestWithTrustProxy (R, trustProxy) {
+   const _Request = buildRegularRequest(R)
+   const proxyFn = getTrustProxyFn(trustProxy)
+@@ -117,7 +126,7 @@ function buildRequestWithTrustProxy (R, trustProxy) {
+     },
+     host: {
+       get () {
+-        if (this.ip !== undefined && this.headers['x-forwarded-host']) {
++        if (isTrustedConnection(this.raw, proxyFn) && this.headers['x-forwarded-host']) {
+           return getLastEntryInMultiHeaderValue(this.headers['x-forwarded-host'])
+         }
+         /**
+@@ -131,7 +140,7 @@ function buildRequestWithTrustProxy (R, trustProxy) {
+     },
+     protocol: {
+       get () {
+-        if (this.headers['x-forwarded-proto']) {
++        if (isTrustedConnection(this.raw, proxyFn) && this.headers['x-forwarded-proto']) {
+           return getLastEntryInMultiHeaderValue(this.headers['x-forwarded-proto'])
+         }
+         if (this.socket) {
+diff --git a/test/trust-proxy.test.js b/test/trust-proxy.test.js
+index ae7b756..4745755 100644
+--- a/test/trust-proxy.test.js
++++ b/test/trust-proxy.test.js
+@@ -160,3 +160,44 @@ test('trust proxy protocol', async t => {
+   await fetchForwardedRequest(fastifyServer, '1.1.1.1', '/trustproxynoprotocol', undefined)
+   await fetchForwardedRequest(fastifyServer, '1.1.1.1', '/trustproxyprotocols', 'ipsum, dolor')
+ })
++
++test('trust proxy, forwarded host/proto ignored when peer is not trusted', async t => {
++  const cases = [
++    { name: 'string', trustProxy: '10.0.0.1' },
++    { name: 'csv string', trustProxy: '10.0.0.1, 10.0.0.2' },
++    { name: 'array', trustProxy: ['10.0.0.1'] },
++    { name: 'function', trustProxy: (addr) => addr === '10.0.0.1' }
++  ]
++  for (const c of cases) {
++    const app = fastify({ trustProxy: c.trustProxy })
++    t.after(() => app.close())
++    app.get('/', (req) => ({ host: req.host, hostname: req.hostname, protocol: req.protocol }))
++    const res = await app.inject({
++      url: '/',
++      headers: { host: 'real.test', 'x-forwarded-host': 'evil.com', 'x-forwarded-proto': 'https' }
++    })
++    t.assert.deepStrictEqual(res.json(), { host: 'real.test', hostname: 'real.test', protocol: 'http' }, c.name)
++  }
++})
++
++test('trust proxy, forwarded host/proto used when peer is trusted', async t => {
++  const cases = [
++    { name: 'string', trustProxy: '127.0.0.1' },
++    { name: 'cidr', trustProxy: '127.0.0.0/8' },
++    { name: 'array', trustProxy: ['127.0.0.1'] },
++    { name: 'function', trustProxy: (addr) => addr === '127.0.0.1' },
++    { name: 'number', trustProxy: 1 },
++    { name: 'true', trustProxy: true }
++  ]
++  for (const c of cases) {
++    const app = fastify({ trustProxy: c.trustProxy })
++    t.after(() => app.close())
++    app.get('/', (req) => ({ host: req.host, hostname: req.hostname, protocol: req.protocol }))
++    const res = await app.inject({
++      url: '/',
++      remoteAddress: '127.0.0.1',
++      headers: { host: 'real.test', 'x-forwarded-host': 'proxy.test', 'x-forwarded-proto': 'https' }
++    })
++    t.assert.deepStrictEqual(res.json(), { host: 'proxy.test', hostname: 'proxy.test', protocol: 'https' }, c.name)
++  }
++})

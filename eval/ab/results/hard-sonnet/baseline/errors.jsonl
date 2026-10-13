@@ -1,0 +1,1 @@
+{"prompt_id":"t7-fastify-header-case","rep":2,"arm":"naive","failure_class":"harness_or_serving","message":"API error 429: You've hit your session limit · resets 4:50am (America/New_York)","wall_min":0.52,"at":"2026-10-13T06:48:56.827Z","exit_code":1}

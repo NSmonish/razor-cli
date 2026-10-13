@@ -1,0 +1,9 @@
+{
+  "name": "fastify",
+  "url": "https://github.com/fastify/fastify",
+  "commit": "3aa8dfd7298c6e02399a7b3c29c637eb092dc9ef",
+  "install": [["npm", "install", "--no-audit", "--no-fund", "--ignore-scripts"]],
+  "test_runner": "node-test",
+  "test_paths": ["test/schema-*.test.js", "test/route*.test.js", "test/validation-error-handling.test.js"],
+  "test_timeout_s": 600
+}

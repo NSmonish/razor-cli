@@ -1,0 +1,175 @@
+diff --git a/lib/content-type.js b/lib/content-type.js
+index f970439..643b26f 100644
+--- a/lib/content-type.js
++++ b/lib/content-type.js
+@@ -3,15 +3,26 @@
+ const { LruMap: Lru } = require('toad-cache')
+ 
+ /**
+- * keyValuePairsReg is used to split the parameters list into associated
+- * key value pairings. The leading `(?:^|;)\s*` anchor ensures the regex
+- * only attempts matches at parameter boundaries, preventing quadratic
+- * backtracking on malformed input.
++ * keyReg matches a parameter name and its `=` at the current position
++ * (sticky), so matching only happens at parameter boundaries.
+  *
+  * @see https://httpwg.org/specs/rfc9110.html#parameter
+  * @type {RegExp}
+  */
+-const keyValuePairsReg = /(?:^|;)\s*([\w!#$%&'*+.^`|~-]+)=([^;]*)/gm
++const keyReg = /\s*([\w!#$%&'*+.^`|~-]+)=/y
++
++/**
++ * Returns the index just past the next `;` at or after `pos`, or the
++ * string length when there is none.
++ *
++ * @param {string} str
++ * @param {number} pos
++ * @returns {number}
++ */
++function skipToSeparator (str, pos) {
++  const idx = str.indexOf(';', pos)
++  return idx === -1 ? str.length : idx + 1
++}
+ 
+ /**
+  * typeNameReg is used to validate that the first part of the media-type
+@@ -132,30 +143,71 @@ class ContentType {
+     this.#subtype = subtype
+     this.#valid = true
+     this.#empty = false
++    this.#parseParameters(paramsList)
++  }
+ 
+-    let matches = keyValuePairsReg.exec(paramsList)
+-    while (matches) {
+-      // https://httpwg.org/specs/rfc9110.html#parameter
++  /**
++   * Parses a `; name=value` parameter list where each value is either a
++   * token or a quoted-string. A `;` inside a quoted-string belongs to the
++   * value and never starts a new parameter.
++   *
++   * @see https://httpwg.org/specs/rfc9110.html#parameter
++   * @param {string} list
++   */
++  #parseParameters (list) {
++    const length = list.length
++    let pos = 0
++    while (pos < length) {
++      keyReg.lastIndex = pos
++      const match = keyReg.exec(list)
++      if (match === null) {
++        // Not a parameter (e.g. stray text); skip to the next boundary.
++        pos = skipToSeparator(list, pos)
++        continue
++      }
+       // Parameter names are case-insensitive.
+-      const key = matches[1].toLowerCase()
+-      // Parameter values might or might not be case-sensitive,
+-      // depending on the semantics of the parameter name.
+-      const value = matches[2]
+-      if (value[0] === '"') {
+-        if (value.at(-1) !== '"') {
+-          this.#parameters.set(key, 'invalid quoted string')
+-          matches = keyValuePairsReg.exec(paramsList)
+-          continue
++      const key = match[1].toLowerCase()
++      pos = keyReg.lastIndex
++
++      if (list[pos] !== '"') {
++        // token value: everything up to the next `;`
++        let end = list.indexOf(';', pos)
++        if (end === -1) end = length
++        this.#parameters.set(key, list.slice(pos, end))
++        pos = end + 1
++        continue
++      }
++
++      // quoted-string value
++      let value = ''
++      let closed = false
++      let i = pos + 1
++      while (i < length) {
++        const char = list[i]
++        if (char === '\\' && i + 1 < length) {
++          value += list[i + 1]
++          i += 2
++        } else if (char === '"') {
++          closed = true
++          i++
++          break
++        } else {
++          value += char
++          i++
+         }
+-        // We should probably verify the value matches a quoted string
+-        // (https://httpwg.org/specs/rfc9110.html#rule.quoted-string) value.
+-        // But we are not really doing much with the parameter values, so we
+-        // are omitting that at this time.
+-        this.#parameters.set(key, value.slice(1, value.length - 1))
+-      } else {
+-        this.#parameters.set(key, value)
+       }
+-      matches = keyValuePairsReg.exec(paramsList)
++
++      if (closed === false) {
++        this.#parameters.set(key, 'invalid quoted string')
++        break
++      }
++
++      let end = list.indexOf(';', i)
++      if (end === -1) end = length
++      // Anything but whitespace between the closing quote and the next
++      // separator makes the quoted string invalid.
++      this.#parameters.set(key, list.slice(i, end).trim() === '' ? value : 'invalid quoted string')
++      pos = end + 1
+     }
+   }
+ 
+@@ -178,7 +230,7 @@ class ContentType {
+     if (this.#string) return this.#string
+     const parameters = []
+     for (const [key, value] of this.#parameters.entries()) {
+-      parameters.push(`${key}="${value}"`)
++      parameters.push(`${key}="${value.replace(/["\\]/g, '\\$&')}"`)
+     }
+     const result = [this.#type, '/', this.#subtype]
+     if (parameters.length > 0) {
+diff --git a/test/content-type.test.js b/test/content-type.test.js
+index 1c6b91f..c7fad99 100644
+--- a/test/content-type.test.js
++++ b/test/content-type.test.js
+@@ -155,6 +155,33 @@ describe('ContentType class', () => {
+     )
+   })
+ 
++  test('keeps semicolons inside quoted parameter values', (t) => {
++    const found = new ContentType('multipart/mixed; boundary="part;one"; charset=utf-8')
++    t.assert.equal(found.isValid, true)
++    t.assert.deepEqual([...found.parameters], [
++      ['boundary', 'part;one'],
++      ['charset', 'utf-8']
++    ])
++  })
++
++  test('does not parse parameters inside quoted values', (t) => {
++    const found = new ContentType('text/plain; title="lang=en; charset=latin1"')
++    t.assert.deepEqual([...found.parameters], [['title', 'lang=en; charset=latin1']])
++    t.assert.equal(found.parameters.has('charset'), false)
++    t.assert.equal(found.parameters.has('lang'), false)
++  })
++
++  test('handles escaped characters in quoted values', (t) => {
++    const found = new ContentType('text/plain; a="x\\"; b=1"; c=2')
++    t.assert.deepEqual([...found.parameters], [['a', 'x"; b=1'], ['c', '2']])
++    t.assert.equal(found.toString(), 'text/plain; a="x\\"; b=1"; c="2"')
++  })
++
++  test('unterminated quoted value swallows the rest as invalid', (t) => {
++    const found = new ContentType('text/plain; a="x; charset=latin1')
++    t.assert.deepEqual([...found.parameters], [['a', 'invalid quoted string']])
++  })
++
+   test('skips invalid quoted string parameters', (t) => {
+     const found = new ContentType('Application/JSON ; charset=utf-8; foo=BaR;baz=" 42')
+     t.assert.equal(found.isEmpty, false)

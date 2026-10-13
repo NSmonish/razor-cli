@@ -1,0 +1,159 @@
+diff --git a/example-application/business-logic/order-service.js b/example-application/business-logic/order-service.js
+index 731719a..af9e9aa 100644
+--- a/example-application/business-logic/order-service.js
++++ b/example-application/business-logic/order-service.js
+@@ -62,14 +62,45 @@ module.exports.getOrder = async function (id) {
+   return await new OrderRepository().getOrderById(id);
+ };
+ 
++const DEFAULT_HTTP_TIMEOUT_MS = 2000;
++
++// Read on every call so that changing HTTP_TIMEOUT takes effect without a restart
++function getHTTPTimeout() {
++  const timeout = Number(process.env.HTTP_TIMEOUT);
++  return Number.isFinite(timeout) && timeout > 0
++    ? timeout
++    : DEFAULT_HTTP_TIMEOUT_MS;
++}
++
+ async function getUserFromUsersService(userId) {
+-  const getUserResponse = await axiosHTTPClient.get(
+-    `http://localhost/user/${userId}`,
+-    {
+-      validateStatus: (status) => {
+-        return status < 500;
++  const timeout = getHTTPTimeout();
++  // axios' timeout only covers socket inactivity, the signal bounds the entire call
++  const signal = AbortSignal.timeout(timeout);
++  try {
++    const getUserResponse = await axiosHTTPClient.get(
++      `http://localhost/user/${userId}`,
++      {
++        timeout,
++        signal,
++        validateStatus: (status) => {
++          return status < 500;
++        },
+       },
+-    },
+-  );
+-  return getUserResponse.data;
++    );
++    return getUserResponse.data;
++  } catch (error) {
++    const isTimeout =
++      signal.aborted ||
++      (error instanceof AxiosError &&
++        (error.code === AxiosError.ECONNABORTED ||
++          error.code === AxiosError.ETIMEDOUT));
++    if (isTimeout) {
++      throw new AppError(
++        'user-verification-timeout',
++        `The users service did not respond within ${timeout}ms`,
++        503,
++      );
++    }
++    throw error;
++  }
+ }
+diff --git a/example-application/test/createOrder.callingOtherServices.test.ts b/example-application/test/createOrder.callingOtherServices.test.ts
+index 8ef15a5..cadd219 100644
+--- a/example-application/test/createOrder.callingOtherServices.test.ts
++++ b/example-application/test/createOrder.callingOtherServices.test.ts
+@@ -109,6 +109,96 @@ describe('/api', () => {
+         ),
+       });
+     });
++
++    describe('When the users service is slow', () => {
++      afterEach(() => {
++        delete process.env.HTTP_TIMEOUT;
++      });
++
++      const orderToAdd = {
++        userId: 1,
++        productId: 2,
++        mode: 'approved',
++      };
++
++      test('When it does not reply within the default timeout, then return http 503', async () => {
++        //Arrange
++        testSetup.removeUserNock();
++        nock('http://localhost/user/')
++          .get('/1')
++          .delay(2500)
++          .reply(200, { id: 1, name: 'John' });
++
++        //Act
++        const startTime = Date.now();
++        const response = await testSetup
++          .getHTTPClient()
++          .post('/order', orderToAdd);
++
++        //Assert
++        expect(response.status).toBe(503);
++        expect(Date.now() - startTime).toBeLessThan(2400);
++      });
++
++      test('When it replies within the default timeout, then the order is added', async () => {
++        //Arrange
++        testSetup.removeUserNock();
++        nock('http://localhost/user/')
++          .get('/1')
++          .delay(1000)
++          .reply(200, { id: 1, name: 'John' });
++
++        //Act
++        const response = await testSetup
++          .getHTTPClient()
++          .post('/order', orderToAdd);
++
++        //Assert
++        expect(response.status).toBe(200);
++      });
++
++      test('When HTTP_TIMEOUT is set and exceeded, then return http 503', async () => {
++        //Arrange
++        process.env.HTTP_TIMEOUT = '100';
++        testSetup.removeUserNock();
++        nock('http://localhost/user/')
++          .get('/1')
++          .delay(500)
++          .reply(200, { id: 1, name: 'John' });
++
++        //Act
++        const response = await testSetup
++          .getHTTPClient()
++          .post('/order', orderToAdd);
++
++        //Assert
++        expect(response.status).toBe(503);
++      });
++
++      test('When HTTP_TIMEOUT is changed between requests, then the new value applies without restart', async () => {
++        //Arrange
++        testSetup.removeUserNock();
++        nock('http://localhost/user/')
++          .get('/1')
++          .times(2)
++          .delay(300)
++          .reply(200, { id: 1, name: 'John' });
++
++        //Act
++        process.env.HTTP_TIMEOUT = '1000';
++        const firstResponse = await testSetup
++          .getHTTPClient()
++          .post('/order', orderToAdd);
++        process.env.HTTP_TIMEOUT = '100';
++        const secondResponse = await testSetup
++          .getHTTPClient()
++          .post('/order', orderToAdd);
++
++        //Assert
++        expect(firstResponse.status).toBe(200);
++        expect(secondResponse.status).toBe(503);
++      });
++    });
+   });
+ 
+ 

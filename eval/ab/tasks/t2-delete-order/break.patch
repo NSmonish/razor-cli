@@ -1,0 +1,18 @@
+diff --git a/example-application/entry-points/api.ts b/example-application/entry-points/api.ts
+index 54fc971..4ecc904 100644
+--- a/example-application/entry-points/api.ts
++++ b/example-application/entry-points/api.ts
+@@ -77,13 +77,6 @@ const defineRoutes = (expressApp: express.Application) => {
+     res.json(response);
+   });
+ 
+-  // delete order by id
+-  router.delete('/:id', async (req, res, next) => {
+-    console.log(`Order API was called to delete order ${req.params.id}`);
+-    await orderService.deleteOrder(req.params.id);
+-    res.status(204).end();
+-  });
+-
+   expressApp.use('/order', router);
+ 
+   expressApp.use(

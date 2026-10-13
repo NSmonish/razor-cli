@@ -1,0 +1,37 @@
+{
+  "id": "t1-premium-discount",
+  "repo": "nodejs-testing-best-practices",
+  "tags": ["bugfix", "business-logic"],
+  "prompt": "prompt.md",
+  "break": "break.patch",
+  "hide": "hide.patch",
+  "supp_files": {
+    "example-application/test/ab-supp.t1.test.ts": "supp/ab-supp.t1.test.ts"
+  },
+  "acceptance": [
+    {
+      "id": "AC1",
+      "desc": "premium order totalPrice 100 is stored/fetched as 90",
+      "source": "orig",
+      "file": "example-application/test/createOrder.responseCheck.test.ts",
+      "title": "When ordered by a premium user, Then 10% discount is applied",
+      "null_expect": "fail"
+    },
+    {
+      "id": "AC2",
+      "desc": "premium order totalPrice 59 is stored/fetched as 54 (rounded up)",
+      "source": "supp",
+      "file": "example-application/test/ab-supp.t1.test.ts",
+      "title": "AC2: premium price is rounded up to a whole number",
+      "null_expect": "fail"
+    },
+    {
+      "id": "AC3",
+      "desc": "non-premium order totalPrice 100 stays 100 (guard against over-broad fix)",
+      "source": "supp",
+      "file": "example-application/test/ab-supp.t1.test.ts",
+      "title": "AC3: non-premium price is unchanged",
+      "null_expect": "pass"
+    }
+  ]
+}

@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<testsuites>
+	<testcase name="should work with valid payload" time="0.061521" classname="test"/>
+	<testcase name="should fail immediately with invalid payload" time="0.010540" classname="test"/>
+	<testcase name="should be able to use setErrorHandler specify custom validation error" time="0.007929" classname="test"/>
+	<testcase name="validation error has 400 statusCode set" time="0.006689" classname="test"/>
+	<testcase name="error inside custom error handler should have validationContext" time="0.001656" classname="test"/>
+	<testcase name="error inside custom error handler should have validationContext if specified by custom error handler" time="0.001212" classname="test"/>
+	<testcase name="should be able to attach validation to request" time="0.006927" classname="test"/>
+	<testcase name="attached validationError exposes the same message sent by the default handler" time="0.006650" classname="test"/>
+	<testcase name="should respect when attachValidation is explicitly set to false" time="0.006856" classname="test"/>
+	<testcase name="Attached validation error should take precedence over setErrorHandler" time="0.005322" classname="test"/>
+	<testcase name="should handle response validation error" time="0.003810" classname="test"/>
+	<testcase name="should handle response validation error with promises" time="0.002029" classname="test"/>
+	<testcase name="should return a defined output message parsing AJV errors" time="0.006205" classname="test"/>
+	<testcase name="should return a defined output message parsing JOI errors" time="0.002777" classname="test"/>
+	<testcase name="should return a defined output message parsing JOI error details" time="0.001181" classname="test"/>
+	<testcase name="the custom error formatter context must be the server instance" time="0.005663" classname="test"/>
+	<testcase name="the custom error formatter context must be the server instance in options" time="0.004360" classname="test"/>
+	<testcase name="should call custom error formatter" time="0.005523" classname="test"/>
+	<testcase name="should catch error inside formatter and return message" time="0.004220" classname="test"/>
+	<testcase name="cannot create a fastify instance with wrong type of errorFormatter" time="0.000496" classname="test"/>
+	<testcase name="should register a route based schema error formatter" time="0.004323" classname="test"/>
+	<testcase name="prefer route based error formatter over global one" time="0.005011" classname="test"/>
+	<testcase name="adding schemaErrorFormatter" time="0.005201" classname="test"/>
+	<testcase name="plugin override" time="0.006431" classname="test"/>
+	<testsuite name="sync and async must work in the same way" time="0.002083" disabled="0" errors="0" tests="2" failures="0" skipped="0" hostname="Sungjoons-MacBook-Pro-7.local">
+		<testcase name="async preValidation with custom validator should trigger error handler when validator throws" time="0.001165" classname="test"/>
+		<testcase name="sync preValidation with custom validator should trigger error handler when validator throws" time="0.000773" classname="test"/>
+	</testsuite>
+	<!-- tests 26 -->
+	<!-- suites 1 -->
+	<!-- pass 26 -->
+	<!-- fail 0 -->
+	<!-- cancelled 0 -->
+	<!-- skipped 0 -->
+	<!-- todo 0 -->
+	<!-- duration_ms 279.508792 -->
+</testsuites>

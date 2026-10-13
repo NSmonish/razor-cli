@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<testsuites>
+	<testcase name="basic test" time="0.042833" classname="test"/>
+	<testcase name="custom serializer options" time="0.004448" classname="test"/>
+	<testcase name="reuse parsed content type when selecting response serializer" time="0.002705" classname="test"/>
+	<testcase name="Different content types" time="0.015254" classname="test"/>
+	<testcase name="Invalid multiple content schema, throw FST_ERR_SCH_CONTENT_MISSING_SCHEMA error" time="0.001159" classname="test"/>
+	<testcase name="Use the same schema id in different places" time="0.001856" classname="test"/>
+	<testcase name="Use shared schema and $ref with $id in response ($ref to $id)" time="0.022990" classname="test"/>
+	<testcase name="Shared schema should be pass to serializer and validator ($ref to shared schema /definitions)" time="0.019102" classname="test"/>
+	<testcase name="Custom setSerializerCompiler" time="0.002633" classname="test"/>
+	<testcase name="Custom setSerializerCompiler returns bad serialized output" time="0.001232" classname="test"/>
+	<testcase name="Custom setSerializerCompiler with addSchema" time="0.000905" classname="test"/>
+	<testcase name="Custom serializer per route" time="0.001956" classname="test"/>
+	<testcase name="Reply serializer win over serializer " time="0.000806" classname="test"/>
+	<testcase name="Reply serializer win over serializer " time="0.000728" classname="test"/>
+	<testcase name="The schema compiler recreate itself if needed" time="0.001537" classname="test"/>
+	<testcase name="The schema changes the default error handler output" time="0.002195" classname="test"/>
+	<testcase name="do not crash if status code serializer errors" time="0.007248" classname="test"/>
+	<testcase name="custom schema serializer error, empty message" time="0.001402" classname="test"/>
+	<testcase name="error in custom schema serialize compiler, throw FST_ERR_SCH_SERIALIZATION_BUILD error" time="0.000730" classname="test"/>
+	<testcase name="Errors in serializer send to errorHandler" time="0.001259" classname="test"/>
+	<testcase name="capital X" time="0.001030" classname="test"/>
+	<testcase name="allow default as status code and used as last fallback" time="0.000961" classname="test"/>
+	<testcase name="response schema is applied when Content-Type has whitespace before parameters" time="0.001111" classname="test"/>
+	<testcase name="response schema is applied when Content-Type has tab before semicolon" time="0.002269" classname="test"/>
+	<testcase name="response schema is applied when Content-Type has trailing semicolon only" time="0.001017" classname="test"/>
+	<!-- tests 25 -->
+	<!-- suites 0 -->
+	<!-- pass 25 -->
+	<!-- fail 0 -->
+	<!-- cancelled 0 -->
+	<!-- skipped 0 -->
+	<!-- todo 0 -->
+	<!-- duration_ms 217.854625 -->
+</testsuites>

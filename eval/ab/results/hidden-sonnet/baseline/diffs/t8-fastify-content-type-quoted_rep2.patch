@@ -1,0 +1,163 @@
+diff --git a/lib/content-type.js b/lib/content-type.js
+index f970439..7ca71e1 100644
+--- a/lib/content-type.js
++++ b/lib/content-type.js
+@@ -3,15 +3,12 @@
+ const { LruMap: Lru } = require('toad-cache')
+ 
+ /**
+- * keyValuePairsReg is used to split the parameters list into associated
+- * key value pairings. The leading `(?:^|;)\s*` anchor ensures the regex
+- * only attempts matches at parameter boundaries, preventing quadratic
+- * backtracking on malformed input.
++ * parameterNameReg validates a parameter name (a token).
+  *
+  * @see https://httpwg.org/specs/rfc9110.html#parameter
+  * @type {RegExp}
+  */
+-const keyValuePairsReg = /(?:^|;)\s*([\w!#$%&'*+.^`|~-]+)=([^;]*)/gm
++const parameterNameReg = /^[\w!#$%&'*+.^`|~-]+$/
+ 
+ /**
+  * typeNameReg is used to validate that the first part of the media-type
+@@ -37,6 +34,26 @@ const typeNameReg = /^[\w!#$%&'*+.^`|~-]+$/
+  */
+ const subtypeNameReg = /^[\w!#$%&'*+.^`|~-]+\s*$/
+ 
++/**
++ * Returns the index of the next `;` at or after `pos` that is not inside a
++ * quoted string, or the string length if there is none.
++ * @param {string} str
++ * @param {number} pos
++ * @returns {number}
++ */
++function skipToBoundary (str, pos) {
++  let quoted = false
++  for (; pos < str.length; pos++) {
++    const ch = str[pos]
++    if (quoted) {
++      if (ch === '\\') pos++
++      else if (ch === '"') quoted = false
++    } else if (ch === '"') quoted = true
++    else if (ch === ';') return pos
++  }
++  return str.length
++}
++
+ /**
+  * Content-Type internal shared cache
+  * @type {Lru<ContentType>}
+@@ -133,29 +150,57 @@ class ContentType {
+     this.#valid = true
+     this.#empty = false
+ 
+-    let matches = keyValuePairsReg.exec(paramsList)
+-    while (matches) {
++    // Parameters are scanned by hand so that a `;` (or anything else) inside
++    // a quoted-string value is never treated as a parameter boundary.
++    // https://httpwg.org/specs/rfc9110.html#rule.quoted-string
++    const len = paramsList.length
++    let pos = 0
++    while (pos < len) {
++      // Skip the `;` separator and any whitespace before the name.
++      while (pos < len && (paramsList[pos] === ';' || /\s/.test(paramsList[pos]))) pos++
++      if (pos >= len) break
++
++      const nameStart = pos
++      while (pos < len && paramsList[pos] !== '=' && paramsList[pos] !== ';') pos++
++      const name = paramsList.slice(nameStart, pos)
++      if (paramsList[pos] !== '=' || parameterNameReg.test(name) === false) {
++        // Not a valid `name=value` pair: skip to the next boundary.
++        pos = skipToBoundary(paramsList, pos)
++        continue
++      }
++      pos++ // consume `=`
++
+       // https://httpwg.org/specs/rfc9110.html#parameter
+       // Parameter names are case-insensitive.
+-      const key = matches[1].toLowerCase()
++      const key = name.toLowerCase()
+       // Parameter values might or might not be case-sensitive,
+       // depending on the semantics of the parameter name.
+-      const value = matches[2]
+-      if (value[0] === '"') {
+-        if (value.at(-1) !== '"') {
+-          this.#parameters.set(key, 'invalid quoted string')
+-          matches = keyValuePairsReg.exec(paramsList)
+-          continue
++      if (paramsList[pos] === '"') {
++        let value = ''
++        let closed = false
++        pos++
++        while (pos < len) {
++          const ch = paramsList[pos]
++          if (ch === '\\' && pos + 1 < len) {
++            value += paramsList[pos + 1]
++            pos += 2
++          } else if (ch === '"') {
++            closed = true
++            pos++
++            break
++          } else {
++            value += ch
++            pos++
++          }
+         }
+-        // We should probably verify the value matches a quoted string
+-        // (https://httpwg.org/specs/rfc9110.html#rule.quoted-string) value.
+-        // But we are not really doing much with the parameter values, so we
+-        // are omitting that at this time.
+-        this.#parameters.set(key, value.slice(1, value.length - 1))
++        this.#parameters.set(key, closed ? value : 'invalid quoted string')
++        // Ignore any garbage between the closing quote and the next `;`.
++        pos = skipToBoundary(paramsList, pos)
+       } else {
+-        this.#parameters.set(key, value)
++        const valueStart = pos
++        while (pos < len && paramsList[pos] !== ';') pos++
++        this.#parameters.set(key, paramsList.slice(valueStart, pos))
+       }
+-      matches = keyValuePairsReg.exec(paramsList)
+     }
+   }
+ 
+@@ -178,7 +223,7 @@ class ContentType {
+     if (this.#string) return this.#string
+     const parameters = []
+     for (const [key, value] of this.#parameters.entries()) {
+-      parameters.push(`${key}="${value}"`)
++      parameters.push(`${key}="${value.replace(/[\\"]/g, '\\$&')}"`)
+     }
+     const result = [this.#type, '/', this.#subtype]
+     if (parameters.length > 0) {
+diff --git a/test/content-type.test.js b/test/content-type.test.js
+index 1c6b91f..73af524 100644
+--- a/test/content-type.test.js
++++ b/test/content-type.test.js
+@@ -155,6 +155,26 @@ describe('ContentType class', () => {
+     )
+   })
+ 
++  test('handles semicolons and parameter-like text in quoted values', (t) => {
++    let found = new ContentType('multipart/mixed; boundary="part;one"; charset=utf-8')
++    t.assert.equal(found.parameters.get('boundary'), 'part;one')
++    t.assert.equal(found.parameters.get('charset'), 'utf-8')
++
++    found = new ContentType('text/plain; title="lang=en; charset=latin1"')
++    t.assert.equal(found.parameters.get('title'), 'lang=en; charset=latin1')
++    t.assert.equal(found.parameters.has('charset'), false)
++    t.assert.equal(found.parameters.has('lang'), false)
++
++    found = new ContentType('text/plain; a="x\\"y;b=c"; d=e')
++    t.assert.equal(found.parameters.get('a'), 'x"y;b=c')
++    t.assert.equal(found.parameters.has('b'), false)
++    t.assert.equal(found.parameters.get('d'), 'e')
++
++    found = new ContentType('text/plain; bad key="x;c=d"; e=f')
++    t.assert.equal(found.parameters.has('c'), false)
++    t.assert.equal(found.parameters.get('e'), 'f')
++  })
++
+   test('skips invalid quoted string parameters', (t) => {
+     const found = new ContentType('Application/JSON ; charset=utf-8; foo=BaR;baz=" 42')
+     t.assert.equal(found.isEmpty, false)

@@ -1,0 +1,31 @@
+diff --git a/example-application/test/createOrder.responseCheck.test.ts b/example-application/test/createOrder.responseCheck.test.ts
+index 08ffa11..d5e8b71 100644
+--- a/example-application/test/createOrder.responseCheck.test.ts
++++ b/example-application/test/createOrder.responseCheck.test.ts
+@@ -87,26 +87,4 @@ describe('POST /orders', () => {
+     //Assert
+     expect(orderAddResult.status).toBe(401);
+   });
+-
+-
+-  test('When ordered by a premium user, Then 10% discount is applied', async () => {
+-    //Arrange
+-    // ️️️✅ Best Practice: Use a dynamic factory to craft big payloads and still clarify which specific details
+-    // are the 'smoking gun' that is responsible for the test outcome
+-    const orderOfPremiumUser = buildOrder({
+-      isPremiumUser: true,
+-      totalPrice: 100,
+-    });
+-
+-    //Act
+-    const addResponse = await testSetup
+-      .getHTTPClient()
+-      .post('/order', orderOfPremiumUser);
+-
+-    //Assert
+-    const orderAfterSave = await testSetup
+-      .getHTTPClient()
+-      .get(`/order/${addResponse.data.id}`);
+-    expect(orderAfterSave.data.totalPrice).toBe(90);
+-  });
+ });

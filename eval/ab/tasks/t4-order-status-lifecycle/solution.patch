@@ -1,0 +1,128 @@
+diff --git a/example-application/business-logic/order-service.js b/example-application/business-logic/order-service.js
+index 461bf0d..8d49bdf 100644
+--- a/example-application/business-logic/order-service.js
++++ b/example-application/business-logic/order-service.js
+@@ -32,6 +32,9 @@ module.exports.addOrder = async function (newOrder) {
+     newOrder.totalPrice = Math.ceil(newOrder.totalPrice * 0.9);
+   }
+ 
++  // every new order starts its lifecycle as 'processing'
++  newOrder.status = 'processing';
++
+   // save to DB (Caution: simplistic code without layers and validation)
+   const DBResponse = await new OrderRepository().addOrder(newOrder);
+ 
+@@ -54,6 +57,41 @@ module.exports.addOrder = async function (newOrder) {
+   return DBResponse;
+ };
+ 
++const orderStatuses = ['processing', 'shipped', 'delivered', 'cancelled', 'returned'];
++const allowedStatusTransitions = {
++  processing: ['shipped', 'cancelled'],
++  shipped: ['delivered'],
++  delivered: ['returned'],
++  cancelled: [],
++  returned: [],
++};
++
++module.exports.changeOrderStatus = async function (id, newStatus) {
++  if (!orderStatuses.includes(newStatus)) {
++    throw new AppError('invalid-status', `Unknown order status ${newStatus}`, 400);
++  }
++  const orderRepository = new OrderRepository();
++  const order = await orderRepository.getOrderById(id);
++  if (!order) {
++    throw new AppError('order-not-found', `Order ${id} was not found`, 404);
++  }
++  const currentStatus = order.status;
++  if (!allowedStatusTransitions[currentStatus].includes(newStatus)) {
++    throw new AppError(
++      'invalid-status-transition',
++      `Order ${id} can't move from ${currentStatus} to ${newStatus}`,
++      409,
++    );
++  }
++  const updatedOrder = await orderRepository.updateStatus(id, newStatus);
++  await new MessageQueueClient().publish(
++    'order.events',
++    'order.events.status-changed',
++    { orderId: Number(id), from: currentStatus, to: newStatus },
++  );
++  return updatedOrder;
++};
++
+ module.exports.deleteOrder = async function (id) {
+   return await new OrderRepository().deleteOrder(id);
+ };
+diff --git a/example-application/data-access/migrations/20261013000000-add-order-status.js b/example-application/data-access/migrations/20261013000000-add-order-status.js
+new file mode 100644
+index 0000000..17a8a47
+--- /dev/null
++++ b/example-application/data-access/migrations/20261013000000-add-order-status.js
+@@ -0,0 +1,13 @@
++module.exports = {
++  up: async (queryInterface, Sequelize) => {
++    await queryInterface.addColumn('Orders', 'status', {
++      type: Sequelize.STRING,
++      allowNull: false,
++      defaultValue: 'processing',
++    });
++  },
++
++  down: async (queryInterface) => {
++    await queryInterface.removeColumn('Orders', 'status');
++  },
++};
+diff --git a/example-application/data-access/order-repository.js b/example-application/data-access/order-repository.js
+index d56e3e5..3346fbf 100644
+--- a/example-application/data-access/order-repository.js
++++ b/example-application/data-access/order-repository.js
+@@ -42,6 +42,11 @@ module.exports = class OrderRepository {
+         isPremiumUser: {
+           type: Sequelize.BOOLEAN,
+         },
++        status: {
++          type: Sequelize.STRING,
++          allowNull: false,
++          defaultValue: 'processing',
++        },
+       });
+     }
+   }
+@@ -56,6 +61,11 @@ module.exports = class OrderRepository {
+     return addingResponse.dataValues;
+   }
+ 
++  async updateStatus(id, status) {
++    await orderModel.update({ status }, { where: { id } });
++    return await this.getOrderById(id);
++  }
++
+   async deleteOrder(orderToDelete) {
+     await orderModel.destroy({ where: { id: orderToDelete } });
+     return;
+diff --git a/example-application/entry-points/api.ts b/example-application/entry-points/api.ts
+index 54fc971..1a7eb14 100644
+--- a/example-application/entry-points/api.ts
++++ b/example-application/entry-points/api.ts
+@@ -77,6 +77,20 @@ const defineRoutes = (expressApp: express.Application) => {
+     res.json(response);
+   });
+ 
++  // change the status of an existing order
++  router.patch('/:id/status', async (req, res, next) => {
++    try {
++      console.log(`Order API was called to change status of order ${req.params.id}`);
++      const updatedOrder = await orderService.changeOrderStatus(
++        req.params.id,
++        req.body?.status,
++      );
++      res.json(updatedOrder);
++    } catch (error) {
++      next(error);
++    }
++  });
++
+   // delete order by id
+   router.delete('/:id', async (req, res, next) => {
+     console.log(`Order API was called to delete order ${req.params.id}`);

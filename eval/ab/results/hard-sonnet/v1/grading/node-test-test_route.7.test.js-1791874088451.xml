@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<testsuites>
+	<testcase name="HEAD route should handle stream.on('error')" time="0.049687" classname="test"/>
+	<testcase name="HEAD route should handle ReadableStream.cancel() error" time="0.002909" classname="test"/>
+	<testcase name="HEAD route should be exposed by default" time="0.002881" classname="test"/>
+	<testcase name="HEAD route should be exposed if route exposeHeadRoute is set" time="0.002409" classname="test"/>
+	<testcase name="Set a custom HEAD route before GET one without disabling exposeHeadRoutes (global)" time="0.002089" classname="test"/>
+	<testcase name="Set a custom HEAD route before GET one without disabling exposeHeadRoutes (route)" time="0.001136" classname="test"/>
+	<testcase name="HEAD routes properly auto created for GET routes when prefixTrailingSlash: 'no-slash'" time="0.003046" classname="test"/>
+	<testcase name="HEAD routes properly auto created for GET routes when prefixTrailingSlash: 'both'" time="0.001979" classname="test"/>
+	<testcase name="GET route with body schema should throw" time="0.001287" classname="test"/>
+	<testcase name="HEAD route with body schema should throw" time="0.000490" classname="test"/>
+	<testcase name="[HEAD, GET] route with body schema should throw" time="0.000253" classname="test"/>
+	<testcase name="GET route with body schema should throw - shorthand" time="0.000164" classname="test"/>
+	<testcase name="HEAD route with body schema should throw - shorthand" time="0.000151" classname="test"/>
+	<!-- tests 13 -->
+	<!-- suites 0 -->
+	<!-- pass 13 -->
+	<!-- fail 0 -->
+	<!-- cancelled 0 -->
+	<!-- skipped 0 -->
+	<!-- todo 0 -->
+	<!-- duration_ms 152.794917 -->
+</testsuites>

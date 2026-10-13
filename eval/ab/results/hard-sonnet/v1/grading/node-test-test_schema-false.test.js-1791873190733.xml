@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<testsuites>
+	<testcase name="false body schema rejects every request" time="0.049104" classname="test"/>
+	<testcase name="custom validatorCompiler receives false body schema" time="0.002310" classname="test"/>
+	<testcase name="null body schema fails ready" time="0.001826" classname="test"/>
+	<testcase name="false querystring schema rejects every request" time="0.007585" classname="test"/>
+	<testcase name="custom validatorCompiler receives false querystring schema" time="0.001465" classname="test"/>
+	<testcase name="null querystring schema fails ready" time="0.001153" classname="test"/>
+	<testcase name="false query schema rejects every request" time="0.007254" classname="test"/>
+	<testcase name="custom validatorCompiler receives false query schema" time="0.002355" classname="test"/>
+	<testcase name="null query schema fails ready" time="0.003661" classname="test"/>
+	<testcase name="false params schema rejects every request" time="0.002500" classname="test"/>
+	<testcase name="custom validatorCompiler receives false params schema" time="0.000715" classname="test"/>
+	<testcase name="null params schema fails ready" time="0.003773" classname="test"/>
+	<testcase name="false headers schema rejects every request" time="0.013821" classname="test"/>
+	<testcase name="custom validatorCompiler receives false headers schema" time="0.000914" classname="test"/>
+	<testcase name="null headers schema fails ready" time="0.002523" classname="test"/>
+	<testcase name="query and querystring together still throw" time="0.001018" classname="test"/>
+	<testcase name="FSTWRN001 only for undefined schemas" time="0.014445" classname="test"/>
+	<!-- tests 17 -->
+	<!-- suites 0 -->
+	<!-- pass 17 -->
+	<!-- fail 0 -->
+	<!-- cancelled 0 -->
+	<!-- skipped 0 -->
+	<!-- todo 0 -->
+	<!-- duration_ms 225.309416 -->
+</testsuites>

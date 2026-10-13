@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<testsuites>
+	<testcase name="Creates a HEAD route for a GET one with prefixTrailingSlash" time="0.032061" classname="test"/>
+	<testcase name="Will not create a HEAD route that is not GET" time="0.012534" classname="test"/>
+	<testcase name="HEAD route should handle properly each response type" time="0.005074" classname="test"/>
+	<testcase name="HEAD route should respect custom onSend handlers" time="0.001342" classname="test"/>
+	<testcase name="route onSend can be function or array of functions" time="0.001416" classname="test"/>
+	<testcase name="no warning for exposeHeadRoute" time="0.002238" classname="test"/>
+	<!-- tests 6 -->
+	<!-- suites 0 -->
+	<!-- pass 6 -->
+	<!-- fail 0 -->
+	<!-- cancelled 0 -->
+	<!-- skipped 0 -->
+	<!-- todo 0 -->
+	<!-- duration_ms 138.219334 -->
+</testsuites>

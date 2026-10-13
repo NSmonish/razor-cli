@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="utf-8"?>
+<testsuites>
+	<testcase name="Should expose addSchema function" time="0.027518" classname="test"/>
+	<testcase name="Should expose getSchema function" time="0.000405" classname="test"/>
+	<testcase name="Should expose getSchemas function" time="0.000241" classname="test"/>
+	<testcase name="Should expose setValidatorCompiler function" time="0.000183" classname="test"/>
+	<testcase name="Should expose setSerializerCompiler function" time="0.000304" classname="test"/>
+	<testcase name="cannot call setValidatorCompiler after binding" time="0.030859" classname="test"/>
+	<testcase name="cannot call setSerializerCompiler after binding" time="0.007570" classname="test"/>
+	<testcase name="The schemas should be added to an internal storage" time="0.001546" classname="test"/>
+	<testcase name="The schemas should be accessible via getSchemas" time="0.001105" classname="test"/>
+	<testcase name="The schema should be accessible by id via getSchema" time="0.006612" classname="test"/>
+	<testcase name="Get validatorCompiler after setValidatorCompiler" time="0.000759" classname="test"/>
+	<testcase name="Get serializerCompiler after setSerializerCompiler" time="0.002668" classname="test"/>
+	<testcase name="Get compilers is empty when settle on routes" time="0.022738" classname="test"/>
+	<testcase name="Should throw if the $id property is missing" time="0.000296" classname="test"/>
+	<testcase name="Cannot add multiple times the same id" time="0.000301" classname="test"/>
+	<testcase name="Cannot add schema for query and querystring" time="0.001137" classname="test"/>
+	<testcase name="Should throw of the schema does not exists in input" time="0.040235" classname="test"/>
+	<testcase name="Should throw if schema is missing for content type" time="0.001139" classname="test"/>
+	<testcase name="Should throw of the schema does not exists in output" time="0.004452" classname="test"/>
+	<testcase name="Should not change the input schemas" time="0.019333" classname="test"/>
+	<testcase name="Should emit warning if the schema headers is undefined" time="0.001541" classname="test"/>
+	<testcase name="Should emit warning if the schema body is undefined" time="0.001472" classname="test"/>
+	<testcase name="Should emit warning if the schema query is undefined" time="0.001267" classname="test"/>
+	<testcase name="Should emit warning if the schema params is undefined" time="0.001132" classname="test"/>
+	<testcase name="Should emit a warning for every route with undefined schema" time="0.006188" classname="test"/>
+	<testcase name="First level $ref" time="0.013929" classname="test"/>
+	<testcase name="Customize validator compiler in instance and route" time="0.003376" classname="test"/>
+	<testcase name="Use the same schema across multiple routes" time="0.008383" classname="test"/>
+	<testcase name="Encapsulation should intervene" time="0.005255" classname="test"/>
+	<testcase name="Encapsulation isolation" time="0.000972" classname="test"/>
+	<testcase name="Add schema after register" time="0.015921" classname="test"/>
+	<testcase name="Encapsulation isolation for getSchemas" time="0.001202" classname="test"/>
+	<testcase name="Use the same schema id in different places" time="0.006472" classname="test"/>
+	<testcase name="Get schema anyway should not add `properties` if allOf is present" time="0.037689" classname="test"/>
+	<testcase name="Get schema anyway should not add `properties` if oneOf is present" time="0.011018" classname="test"/>
+	<testcase name="Get schema anyway should not add `properties` if anyOf is present" time="0.006931" classname="test"/>
+	<testcase name="Shared schema should be ignored in string enum" time="0.005633" classname="test"/>
+	<testcase name="Shared schema should NOT be ignored in != string enum" time="0.019320" classname="test"/>
+	<testcase name="Case insensitive header validation" time="0.008885" classname="test"/>
+	<testcase name="Not evaluate json-schema $schema keyword" time="0.011403" classname="test"/>
+	<testcase name="Validation context in validation result" time="0.007730" classname="test"/>
+	<testcase name="The schema build should not modify the input" time="0.017274" classname="test"/>
+	<testcase name="Cross schema reference with encapsulation references" time="0.023433" classname="test"/>
+	<testcase name="Check how many AJV instances are built #1" time="0.025742" classname="test"/>
+	<testcase name="onReady hook has the compilers ready" time="0.005804" classname="test"/>
+	<testcase name="Check how many AJV instances are built #2 - verify validatorPool" time="0.022409" classname="test"/>
+	<testcase name="Add schema order should not break the startup" time="0.005179" classname="test"/>
+	<testcase name="The schema compiler recreate itself if needed" time="0.009505" classname="test"/>
+	<testcase name="Schema controller setter" time="0.001958" classname="test"/>
+	<testcase name="Schema controller bucket" time="0.001778" classname="test"/>
+	<testcase name="setSchemaController per instance" time="0.001156" classname="test"/>
+	<testcase name="setSchemaController: Inherits correctly parent schemas with a customized validator instance" time="0.008727" classname="test"/>
+	<testcase name="setSchemaController: Inherits buildSerializer from parent if not present within the instance" time="0.004908" classname="test"/>
+	<testcase name="setSchemaController: Inherits buildValidator from parent if not present within the instance" time="0.004634" classname="test"/>
+	<testcase name="Should throw if not default validator passed" time="0.012827" classname="test"/>
+	<testcase name="Should coerce the array if the default validator is used" time="0.007415" classname="test"/>
+	<testcase name="Should return a human-friendly error if response status codes are not specified" time="0.000808" classname="test"/>
+	<testcase name="setSchemaController: custom validator instance should not mutate headers schema" time="0.000664" classname="test"/>
+	<!-- tests 58 -->
+	<!-- suites 0 -->
+	<!-- pass 58 -->
+	<!-- fail 0 -->
+	<!-- cancelled 0 -->
+	<!-- skipped 0 -->
+	<!-- todo 0 -->
+	<!-- duration_ms 643.299584 -->
+</testsuites>

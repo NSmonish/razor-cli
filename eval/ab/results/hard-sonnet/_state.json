@@ -1,0 +1,57 @@
+{
+  "metrics": [
+    {
+      "id": "pass",
+      "label": "Pass",
+      "kind": "binary"
+    },
+    {
+      "id": "AC1",
+      "label": "AC1",
+      "kind": "binary"
+    },
+    {
+      "id": "AC2",
+      "label": "AC2",
+      "kind": "binary"
+    },
+    {
+      "id": "AC3",
+      "label": "AC3",
+      "kind": "binary"
+    },
+    {
+      "id": "AC4",
+      "label": "AC4",
+      "kind": "binary"
+    }
+  ],
+  "perf_fields": [
+    {
+      "id": "total_tokens",
+      "label": "Tokens"
+    },
+    {
+      "id": "peak_context",
+      "label": "Peak ctx"
+    },
+    {
+      "id": "duration_min",
+      "label": "Time",
+      "unit": "min"
+    },
+    {
+      "id": "claude_cost_usd",
+      "label": "Cost",
+      "unit": "$"
+    },
+    {
+      "id": "tool_calls",
+      "label": "Tool calls"
+    },
+    {
+      "id": "recorrection_loops",
+      "label": "Loops"
+    }
+  ]
+}

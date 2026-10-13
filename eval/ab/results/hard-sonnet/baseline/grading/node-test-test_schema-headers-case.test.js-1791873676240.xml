@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<testsuites>
+	<testcase name="dependencies array form is lowercased" time="0.057866" classname="test"/>
+	<testcase name="dependencies subschema form is lowercased" time="0.010481" classname="test"/>
+	<testcase name="dependentRequired and dependentSchemas are lowercased" time="0.014999" classname="test"/>
+	<testcase name="nested subschemas and local $ref definitions are lowercased" time="0.019855" classname="test"/>
+	<testcase name="the user schema is not mutated" time="0.005942" classname="test"/>
+	<testcase name="FSTSEC002 is emitted for external $ref only" time="0.019361" classname="test"/>
+	<!-- tests 6 -->
+	<!-- suites 0 -->
+	<!-- pass 6 -->
+	<!-- fail 0 -->
+	<!-- cancelled 0 -->
+	<!-- skipped 0 -->
+	<!-- todo 0 -->
+	<!-- duration_ms 203.683292 -->
+</testsuites>
