@@ -1,0 +1,87 @@
+diff --git a/example-application/business-logic/order-service.js b/example-application/business-logic/order-service.js
+index 731719a..2e0ea14 100644
+--- a/example-application/business-logic/order-service.js
++++ b/example-application/business-logic/order-service.js
+@@ -62,14 +62,44 @@ module.exports.getOrder = async function (id) {
+   return await new OrderRepository().getOrderById(id);
+ };
+ 
++const DEFAULT_HTTP_TIMEOUT_MS = 2000;
++
++// Read on every call so that changing the env var applies without a restart
++function getHTTPTimeout() {
++  const timeout = Number(process.env.HTTP_TIMEOUT);
++  return Number.isFinite(timeout) && timeout > 0
++    ? timeout
++    : DEFAULT_HTTP_TIMEOUT_MS;
++}
++
+ async function getUserFromUsersService(userId) {
+-  const getUserResponse = await axiosHTTPClient.get(
+-    `http://localhost/user/${userId}`,
+-    {
+-      validateStatus: (status) => {
+-        return status < 500;
++  const timeout = getHTTPTimeout();
++  try {
++    const getUserResponse = await axiosHTTPClient.get(
++      `http://localhost/user/${userId}`,
++      {
++        timeout,
++        // Hard deadline for the whole call, including connect/response stalls
++        signal: AbortSignal.timeout(timeout),
++        validateStatus: (status) => {
++          return status < 500;
++        },
+       },
+-    },
+-  );
+-  return getUserResponse.data;
++    );
++    return getUserResponse.data;
++  } catch (error) {
++    if (
++      axios.isCancel(error) ||
++      error.code === 'ECONNABORTED' ||
++      error.code === 'ETIMEDOUT' ||
++      error.name === 'TimeoutError'
++    ) {
++      throw new AppError(
++        'user-verification-timeout',
++        `The users service did not respond within ${timeout}ms`,
++        503,
++      );
++    }
++    throw error;
++  }
+ }
+diff --git a/example-application/test/createOrder.callingOtherServices.test.ts b/example-application/test/createOrder.callingOtherServices.test.ts
+index 8ef15a5..f190719 100644
+--- a/example-application/test/createOrder.callingOtherServices.test.ts
++++ b/example-application/test/createOrder.callingOtherServices.test.ts
+@@ -112,6 +112,25 @@ describe('/api', () => {
+   });
+ 
+ 
++  test('When users service is slower than HTTP_TIMEOUT, then the API responds with 503', async () => {
++    //Arrange
++    process.env.HTTP_TIMEOUT = '200';
++    testSetup.removeUserNock();
++    nock('http://localhost/user/')
++      .get('/1')
++      .delay(1000)
++      .reply(200, { id: 1, name: 'John' });
++    const orderToAdd = { userId: 1, productId: 2, mode: 'approved' };
++
++    //Act
++    const response = await testSetup.getHTTPClient().post('/order', orderToAdd);
++
++    //Assert
++    delete process.env.HTTP_TIMEOUT;
++    expect(response.status).toBe(503);
++  });
++
++
+   //TODO: Fix a bug here
+   test.skip('When users service replies with 503 once and retry mechanism is applied, then an order is added successfully', async () => {
+     //Arrange

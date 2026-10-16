@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<testsuites>
+	<testcase name="does not mutate joi schemas" time="0.039236" classname="test"/>
+	<testcase name="multiple routes with one schema" time="0.019772" classname="test"/>
+	<testcase name="route error handler overrides default error handler" time="0.003491" classname="test"/>
+	<testcase name="route error handler does not affect other routes" time="0.001704" classname="test"/>
+	<testcase name="async error handler for a route" time="0.001268" classname="test"/>
+	<!-- tests 5 -->
+	<!-- suites 0 -->
+	<!-- pass 5 -->
+	<!-- fail 0 -->
+	<!-- cancelled 0 -->
+	<!-- skipped 0 -->
+	<!-- todo 0 -->
+	<!-- duration_ms 163.769625 -->
+</testsuites>

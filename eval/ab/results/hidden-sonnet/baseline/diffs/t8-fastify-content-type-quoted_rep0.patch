@@ -1,0 +1,143 @@
+diff --git a/lib/content-type.js b/lib/content-type.js
+index f970439..e4213c3 100644
+--- a/lib/content-type.js
++++ b/lib/content-type.js
+@@ -3,15 +3,14 @@
+ const { LruMap: Lru } = require('toad-cache')
+ 
+ /**
+- * keyValuePairsReg is used to split the parameters list into associated
+- * key value pairings. The leading `(?:^|;)\s*` anchor ensures the regex
+- * only attempts matches at parameter boundaries, preventing quadratic
+- * backtracking on malformed input.
++ * paramNameReg matches a parameter name followed by `=` at the current
++ * position (sticky). Parameters are scanned by hand so that `;` inside a
++ * quoted-string value is not treated as a parameter delimiter.
+  *
+  * @see https://httpwg.org/specs/rfc9110.html#parameter
+  * @type {RegExp}
+  */
+-const keyValuePairsReg = /(?:^|;)\s*([\w!#$%&'*+.^`|~-]+)=([^;]*)/gm
++const paramNameReg = /\s*([\w!#$%&'*+.^`|~-]+)=/y
+ 
+ /**
+  * typeNameReg is used to validate that the first part of the media-type
+@@ -133,29 +132,57 @@ class ContentType {
+     this.#valid = true
+     this.#empty = false
+ 
+-    let matches = keyValuePairsReg.exec(paramsList)
+-    while (matches) {
++    const length = paramsList.length
++    let pos = 0
++    while (pos < length) {
++      paramNameReg.lastIndex = pos
++      const matches = paramNameReg.exec(paramsList)
++      if (matches === null) {
++        // Not a `name=` pair: skip to the next parameter boundary.
++        const next = paramsList.indexOf(';', pos)
++        if (next === -1) break
++        pos = next + 1
++        continue
++      }
+       // https://httpwg.org/specs/rfc9110.html#parameter
+       // Parameter names are case-insensitive.
+       const key = matches[1].toLowerCase()
+-      // Parameter values might or might not be case-sensitive,
+-      // depending on the semantics of the parameter name.
+-      const value = matches[2]
+-      if (value[0] === '"') {
+-        if (value.at(-1) !== '"') {
++      pos = paramNameReg.lastIndex
++
++      if (paramsList[pos] === '"') {
++        // https://httpwg.org/specs/rfc9110.html#rule.quoted-string
++        let value = ''
++        let closed = false
++        pos++
++        while (pos < length) {
++          const char = paramsList[pos++]
++          if (char === '\\' && pos < length) {
++            value += paramsList[pos++]
++          } else if (char === '"') {
++            closed = true
++            break
++          } else {
++            value += char
++          }
++        }
++        // Anything between the closing quote and the next `;` is garbage.
++        let next = paramsList.indexOf(';', pos)
++        if (next === -1) next = length
++        const trailing = paramsList.slice(pos, next)
++        if (closed === false || trailing.trim() !== '') {
+           this.#parameters.set(key, 'invalid quoted string')
+-          matches = keyValuePairsReg.exec(paramsList)
+-          continue
++        } else {
++          this.#parameters.set(key, value)
+         }
+-        // We should probably verify the value matches a quoted string
+-        // (https://httpwg.org/specs/rfc9110.html#rule.quoted-string) value.
+-        // But we are not really doing much with the parameter values, so we
+-        // are omitting that at this time.
+-        this.#parameters.set(key, value.slice(1, value.length - 1))
++        pos = next + 1
+       } else {
+-        this.#parameters.set(key, value)
++        let next = paramsList.indexOf(';', pos)
++        if (next === -1) next = length
++        // Parameter values might or might not be case-sensitive,
++        // depending on the semantics of the parameter name.
++        this.#parameters.set(key, paramsList.slice(pos, next))
++        pos = next + 1
+       }
+-      matches = keyValuePairsReg.exec(paramsList)
+     }
+   }
+ 
+diff --git a/test/content-type.test.js b/test/content-type.test.js
+index 1c6b91f..e30cf75 100644
+--- a/test/content-type.test.js
++++ b/test/content-type.test.js
+@@ -199,3 +199,40 @@ describe('ContentType class cache', () => {
+     t.assert.notEqual(contentType1, contentType2)
+   })
+ })
++
++describe('ContentType quoted parameter values', () => {
++  test('semicolon inside quoted value is kept and later params parse', t => {
++    const ct = new ContentType('multipart/mixed; boundary="part;one"; charset=utf-8')
++    t.assert.strictEqual(ct.isValid, true)
++    t.assert.strictEqual(ct.parameters.get('boundary'), 'part;one')
++    t.assert.strictEqual(ct.parameters.get('charset'), 'utf-8')
++  })
++
++  test('content of a quoted value is never a parameter', t => {
++    const ct = new ContentType('text/plain; title="lang=en; charset=latin1"')
++    t.assert.strictEqual(ct.parameters.get('title'), 'lang=en; charset=latin1')
++    t.assert.strictEqual(ct.parameters.has('charset'), false)
++    t.assert.strictEqual(ct.parameters.has('lang'), false)
++  })
++
++  test('escaped backslash before closing quote', t => {
++    const ct = new ContentType('text/plain; c="q\\\\"; d=2')
++    t.assert.strictEqual(ct.parameters.get('c'), 'q\\')
++    t.assert.strictEqual(ct.parameters.get('d'), '2')
++  })
++
++  test('escaped quote inside value', t => {
++    const ct = new ContentType('text/plain; a="x\\";y=1"; b=2')
++    t.assert.strictEqual(ct.parameters.get('a'), 'x";y=1')
++    t.assert.strictEqual(ct.parameters.get('b'), '2')
++  })
++
++  test('unterminated and garbage-suffixed quoted values are invalid', t => {
++    const ct = new ContentType('text/plain; a="x; b=1')
++    t.assert.strictEqual(ct.parameters.get('a'), 'invalid quoted string')
++    t.assert.strictEqual(ct.parameters.has('b'), false)
++    const ct2 = new ContentType('text/plain; a="x"y; b=1')
++    t.assert.strictEqual(ct2.parameters.get('a'), 'invalid quoted string')
++    t.assert.strictEqual(ct2.parameters.get('b'), '1')
++  })
++})

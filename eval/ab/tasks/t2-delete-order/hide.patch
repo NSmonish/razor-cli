@@ -1,0 +1,33 @@
+diff --git a/example-application/test/createOrder.stateCheck.test.ts b/example-application/test/createOrder.stateCheck.test.ts
+index e5d419b..66c4de1 100644
+--- a/example-application/test/createOrder.stateCheck.test.ts
++++ b/example-application/test/createOrder.stateCheck.test.ts
+@@ -47,28 +47,3 @@ describe('POST /orders', () => {
+     });
+   });
+ });
+-
+-describe('DELETE /order', () => {
+-  test.only('When deleting an existing order, Then it should NOT be retrievable', async () => {
+-    // Arrange
+-    const deletedOrder = (
+-      await testSetup.getHTTPClienForArrange().post('/order', buildOrder())
+-    ).data.id;
+-    const notDeletedOrder = (
+-      await testSetup.getHTTPClienForArrange().post('/order', buildOrder())
+-    ).data.id;
+-
+-    // Act
+-    await testSetup.getHTTPClient().delete(`/order/${deletedOrder}`);
+-
+-    // Assert
+-    const getDeletedOrderStatus = await testSetup
+-      .getHTTPClient()
+-      .get(`/order/${deletedOrder}`);
+-    const getNotDeletedOrderStatus = await testSetup
+-      .getHTTPClient()
+-      .get(`/order/${notDeletedOrder}`);
+-    expect(getDeletedOrderStatus.status).toBe(404);
+-    expect(getNotDeletedOrderStatus.status).toBe(200);
+-  });
+-});

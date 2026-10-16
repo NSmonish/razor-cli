@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<testsuites>
+	<testcase name="Basic validation test" time="0.045939" classname="test"/>
+	<testcase name="Different schema per content type" time="0.015380" classname="test"/>
+	<testcase name="Skip validation if no schema for content type" time="0.007396" classname="test"/>
+	<testcase name="Skip validation if no content type schemas" time="0.001947" classname="test"/>
+	<testcase name="External AJV instance" time="0.016132" classname="test"/>
+	<testcase name="Encapsulation" time="0.009957" classname="test"/>
+	<testcase name="Triple $ref with a simple $id" time="0.008275" classname="test"/>
+	<testcase name="Extending schema" time="0.006749" classname="test"/>
+	<testcase name="Should work with nested ids" time="0.007677" classname="test"/>
+	<testcase name="Use the same schema across multiple routes" time="0.006293" classname="test"/>
+	<testcase name="JSON Schema validation keywords" time="0.006313" classname="test"/>
+	<testcase name="Nested id calls" time="0.005033" classname="test"/>
+	<testcase name="Use the same schema id in different places" time="0.005504" classname="test"/>
+	<testcase name="Use shared schema and $ref with $id ($ref to $id)" time="0.005178" classname="test"/>
+	<testcase name="Use items with $ref" time="0.005461" classname="test"/>
+	<testcase name="Use $ref to /definitions" time="0.005822" classname="test"/>
+	<testcase name="Custom AJV settings - pt1" time="0.005614" classname="test"/>
+	<testcase name="Custom AJV settings - pt2" time="0.005152" classname="test"/>
+	<testcase name="Custom AJV settings on different parameters - pt1" time="0.008480" classname="test"/>
+	<testcase name="Custom AJV settings on different parameters - pt2" time="0.005846" classname="test"/>
+	<testcase name="The same $id in route's schema must not overwrite others" time="0.007415" classname="test"/>
+	<testcase name="Custom validator compiler should not mutate schema" time="0.000768" classname="test"/>
+	<testcase name="Custom validator builder override by custom validator compiler" time="0.005369" classname="test"/>
+	<testcase name="Custom validator builder override by custom validator compiler in child instance" time="0.009103" classname="test"/>
+	<testcase name="Schema validation when no content type is provided" time="0.006130" classname="test"/>
+	<testcase name="Schema validation will not be bypass by different content type" time="0.045876" classname="test"/>
+	<testcase name="coercion of empty string to null with nullable types" time="0.005321" classname="test"/>
+	<testcase name="header schema dependencies with canonical-case names are enforced" time="0.007387" classname="test"/>
+	<testcase name="header schema dependencies: lowercase-equivalent schema behaves identically" time="0.005465" classname="test"/>
+	<testcase name="header schema dependencies are normalized in nested subschemas" time="0.004787" classname="test"/>
+	<testcase name="header schema dependencies are normalized in local $ref definitions" time="0.005161" classname="test"/>
+	<testcase name="header schema dependencies: subschema-form dependency values are normalized" time="0.006175" classname="test"/>
+	<testcase name="header schema lowercasing does not mutate the input schema" time="0.004429" classname="test"/>
+	<testcase name="header schema with an external $ref emits FSTSEC002 (case-normalization does not reach it)" time="0.004524" classname="test"/>
+	<testcase name="inline and local $ref header schemas do not emit FSTSEC002" time="0.005085" classname="test"/>
+	<!-- tests 35 -->
+	<!-- suites 0 -->
+	<!-- pass 35 -->
+	<!-- fail 0 -->
+	<!-- cancelled 0 -->
+	<!-- skipped 0 -->
+	<!-- todo 0 -->
+	<!-- duration_ms 409.072625 -->
+</testsuites>

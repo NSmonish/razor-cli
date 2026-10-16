@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<testsuites>
+	<testsuite name="hasContentTypeParser" time="0.087979" disabled="0" errors="0" tests="2" failures="0" skipped="0" hostname="Sungjoons-MacBook-Pro-7.local">
+		<testcase name="should know about internal parsers" time="0.086248" classname="test"/>
+		<testcase name="should only work with string and RegExp" time="0.001219" classname="test"/>
+	</testsuite>
+	<testsuite name="getParser" time="0.008975" disabled="0" errors="0" tests="7" failures="0" skipped="0" hostname="Sungjoons-MacBook-Pro-7.local">
+		<testcase name="should return matching parser" time="0.002856" classname="test"/>
+		<testcase name="should return matching parser with caching /1" time="0.001205" classname="test"/>
+		<testcase name="should return matching parser with caching /2" time="0.000485" classname="test"/>
+		<testcase name="should return matching parser with caching /3" time="0.000779" classname="test"/>
+		<testcase name="should prefer content type parser with string value" time="0.000969" classname="test"/>
+		<testcase name="should return parser that catches all if no other is set" time="0.000582" classname="test"/>
+		<testcase name="should return undefined if no matching parser exist" time="0.001099" classname="test"/>
+	</testsuite>
+	<testsuite name="existingParser" time="0.046781" disabled="0" errors="0" tests="2" failures="0" skipped="0" hostname="Sungjoons-MacBook-Pro-7.local">
+		<testcase name="returns always false for &amp;quot;*&amp;quot;" time="0.012552" classname="test"/>
+		<testcase name="let you override the default parser once" time="0.002484" classname="test"/>
+	</testsuite>
+	<testsuite name="add" time="0.021117" disabled="0" errors="0" tests="4" failures="0" skipped="0" hostname="Sungjoons-MacBook-Pro-7.local">
+		<testcase name="should only accept string and RegExp" time="0.020226" classname="test"/>
+		<testcase name="should set &amp;quot;*&amp;quot; as parser that catches all" time="0.000308" classname="test"/>
+		<testcase name="should lowercase contentTypeParser name" time="0.000192" classname="test"/>
+		<testcase name="should trim contentTypeParser name" time="0.000168" classname="test"/>
+	</testsuite>
+	<testcase name="non-Error thrown from content parser is properly handled" time="0.089849" classname="test"/>
+	<testcase name="Error thrown 415 from content type is null and make post request to server" time="0.004330" classname="test"/>
+	<testsuite name="remove" time="0.001089" disabled="0" errors="0" tests="5" failures="0" skipped="0" hostname="Sungjoons-MacBook-Pro-7.local">
+		<testcase name="should remove default parser" time="0.000292" classname="test"/>
+		<testcase name="should remove RegExp parser" time="0.000232" classname="test"/>
+		<testcase name="should throw an error if content type is neither string nor RegExp" time="0.000146" classname="test"/>
+		<testcase name="should return false if content type does not exist" time="0.000115" classname="test"/>
+		<testcase name="should not remove any content type parser if content type does not exist" time="0.000106" classname="test"/>
+	</testsuite>
+	<testcase name="remove all should remove all existing parsers and reset cache" time="0.000140" classname="test"/>
+	<testcase name="Safeguard against malicious content-type / 1" time="0.033676" classname="test"/>
+	<testcase name="Safeguard against malicious content-type / 2" time="0.001316" classname="test"/>
+	<testcase name="Safeguard against malicious content-type / 3" time="0.004773" classname="test"/>
+	<testcase name="Safeguard against content-type spoofing - string" time="0.001342" classname="test"/>
+	<testsuite name="Warning against improper content-type - regexp" time="0.004486" disabled="0" errors="0" tests="2" failures="0" skipped="0" hostname="Sungjoons-MacBook-Pro-7.local">
+		<testcase name="improper regex - text plain" time="0.002779" classname="test"/>
+		<testcase name="improper regex - application json" time="0.001183" classname="test"/>
+	</testsuite>
+	<testcase name="content-type match parameters - string 1" time="0.002003" classname="test"/>
+	<testcase name="content-type match parameters - regexp" time="0.025381" classname="test"/>
+	<testcase name="content-type fail when parameters not match - string 1" time="0.009424" classname="test"/>
+	<testcase name="content-type fail when parameters not match - string 2" time="0.006294" classname="test"/>
+	<testcase name="content-type fail when parameters not match - regexp" time="0.003603" classname="test"/>
+	<testcase name="content-type regexp list should be cloned when plugin override" time="0.040526" classname="test"/>
+	<testcase name="invalid content-type error message should not contain format placeholder" time="0.005419" classname="test"/>
+	<testcase name="content-type fail when not a valid type" time="0.000420" classname="test"/>
+	<!-- tests 43 -->
+	<!-- suites 0 -->
+	<!-- pass 43 -->
+	<!-- fail 0 -->
+	<!-- cancelled 0 -->
+	<!-- skipped 0 -->
+	<!-- todo 0 -->
+	<!-- duration_ms 675.005958 -->
+</testsuites>

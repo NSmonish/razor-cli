@@ -1,0 +1,110 @@
+diff --git a/example-application/business-logic/order-service.js b/example-application/business-logic/order-service.js
+index d77223f..6083189 100644
+--- a/example-application/business-logic/order-service.js
++++ b/example-application/business-logic/order-service.js
+@@ -27,8 +27,10 @@ module.exports.addOrder = async function (newOrder) {
+     );
+   }
+ 
++  const orderToSave = applyPremiumDiscount(newOrder);
++
+   // save to DB (Caution: simplistic code without layers and validation)
+-  const DBResponse = await new OrderRepository().addOrder(newOrder);
++  const DBResponse = await new OrderRepository().addOrder(orderToSave);
+ 
+   console.log('DBResponse', DBResponse);
+   if (process.env.SEND_MAILS === 'true') {
+@@ -43,7 +45,7 @@ module.exports.addOrder = async function (newOrder) {
+   await new MessageQueueClient().publish(
+     'order.events',
+     'order.events.new',
+-    newOrder,
++    orderToSave,
+   );
+ 
+   return DBResponse;
+@@ -57,6 +59,16 @@ module.exports.getOrder = async function (id) {
+   return await new OrderRepository().getOrderById(id);
+ };
+ 
++// Premium users get a 10% discount on the total price, rounded up to a whole number
++function applyPremiumDiscount(order) {
++  if (order.isPremiumUser !== true || typeof order.totalPrice !== 'number') {
++    return order;
++  }
++  // Integer arithmetic avoids float artifacts (e.g. 70 * 0.9 = 63.00000000000001)
++  const discountedPrice = Math.ceil((order.totalPrice * 9) / 10);
++  return { ...order, totalPrice: discountedPrice };
++}
++
+ async function getUserFromUsersService(userId) {
+   try {
+     const getUserResponse = await axiosHTTPClient.get(
+diff --git a/example-application/test/createOrder.premiumDiscount.test.ts b/example-application/test/createOrder.premiumDiscount.test.ts
+new file mode 100644
+index 0000000..7ebadaa
+--- /dev/null
++++ b/example-application/test/createOrder.premiumDiscount.test.ts
+@@ -0,0 +1,62 @@
++import { buildOrder } from './order-data-factory';
++import { testSetup } from './setup/test-file-setup';
++
++beforeAll(async () => {
++  await testSetup.start({
++    startAPI: true,
++    disableNetConnect: true,
++    includeTokenInHttpClient: true,
++    mockGetUserCalls: true,
++    mockMailerCalls: true,
++  });
++});
++
++beforeEach(() => {
++  testSetup.resetBeforeEach();
++});
++
++afterAll(async () => {
++  testSetup.tearDownTestFile();
++});
++
++// 🎯 This file is about the premium-user pricing policy
++describe('POST /orders', () => {
++  test.each([
++    { totalPrice: 59, expectedPrice: 54 }, // 53.1 is rounded up
++    { totalPrice: 70, expectedPrice: 63 }, // whole result is not rounded further
++    { totalPrice: 1, expectedPrice: 1 }, // 0.9 is rounded up
++  ])(
++    'When a premium user adds an order of $totalPrice, Then the stored price is $expectedPrice',
++    async ({ totalPrice, expectedPrice }) => {
++      //Arrange
++      const orderToAdd = buildOrder({ isPremiumUser: true, totalPrice });
++
++      //Act
++      const {
++        data: { id: addedOrderId },
++      } = await testSetup.getHTTPClient().post('/order', orderToAdd);
++
++      //Assert
++      const getOrderResponse = await testSetup
++        .getHTTPClient()
++        .get(`/order/${addedOrderId}`);
++      expect(getOrderResponse.data.totalPrice).toBe(expectedPrice);
++    },
++  );
++
++  test('When a non-premium user adds an order, Then the stored price is unchanged', async () => {
++    //Arrange
++    const orderToAdd = buildOrder({ isPremiumUser: false, totalPrice: 59 });
++
++    //Act
++    const {
++      data: { id: addedOrderId },
++    } = await testSetup.getHTTPClient().post('/order', orderToAdd);
++
++    //Assert
++    const getOrderResponse = await testSetup
++      .getHTTPClient()
++      .get(`/order/${addedOrderId}`);
++    expect(getOrderResponse.data.totalPrice).toBe(59);
++  });
++});

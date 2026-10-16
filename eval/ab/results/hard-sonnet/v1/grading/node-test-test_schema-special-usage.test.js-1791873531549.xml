@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<testsuites>
+	<testcase name="Ajv plugins array parameter" time="0.053141" classname="test"/>
+	<testcase name="Should handle root $merge keywords in header" time="0.014663" classname="test"/>
+	<testcase name="Should handle root $patch keywords in header" time="0.013527" classname="test"/>
+	<testcase name="Should handle $merge keywords in body" time="0.009879" classname="test"/>
+	<testcase name="Should handle $patch keywords in body" time="0.008714" classname="test"/>
+	<testcase name="serializer read validator's schemas" time="0.015072" classname="test"/>
+	<testcase name="setSchemaController in a plugin" time="0.006468" classname="test"/>
+	<testcase name="side effect on schema let the server crash" time="0.008515" classname="test"/>
+	<testcase name="only response schema trigger AJV pollution" time="0.008681" classname="test"/>
+	<testcase name="only response schema trigger AJV pollution #2" time="0.006914" classname="test"/>
+	<testcase name="setSchemaController in a plugin with head routes" time="0.006195" classname="test"/>
+	<testcase name="multiple refs with the same ids" time="0.006589" classname="test"/>
+	<testcase name="JOI validation overwrite request headers" time="0.002875" classname="test"/>
+	<testcase name="Custom schema object should not trigger FST_ERR_SCH_DUPLICATE" time="0.001230" classname="test"/>
+	<testcase name="The default schema compilers should not be called when overwritten by the user" time="0.004586" classname="test"/>
+	<testcase name="Supports async JOI validation" time="0.002211" classname="test"/>
+	<testcase name="Supports async AJV validation" time="0.009534" classname="test"/>
+	<testcase name="Check all the async AJV validation paths" time="0.007127" classname="test"/>
+	<testcase name="Check mixed sync and async AJV validations" time="0.008912" classname="test"/>
+	<testcase name="Check if hooks and attachValidation work with AJV validations" time="0.005791" classname="test"/>
+	<!-- tests 20 -->
+	<!-- suites 0 -->
+	<!-- pass 20 -->
+	<!-- fail 0 -->
+	<!-- cancelled 0 -->
+	<!-- skipped 0 -->
+	<!-- todo 0 -->
+	<!-- duration_ms 341.979375 -->
+</testsuites>

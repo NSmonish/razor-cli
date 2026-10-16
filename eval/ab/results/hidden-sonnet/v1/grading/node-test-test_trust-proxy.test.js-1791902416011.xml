@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<testsuites>
+	<testcase name="trust proxy, not add properties to node req" time="0.058192" classname="test"/>
+	<testcase name="trust proxy chain" time="0.007196" classname="test"/>
+	<testcase name="trust proxy function" time="0.005139" classname="test"/>
+	<testcase name="trust proxy number" time="0.005615" classname="test"/>
+	<testcase name="trust proxy IP addresses" time="0.005459" classname="test"/>
+	<testcase name="trust proxy protocol" time="0.007704" classname="test"/>
+	<testcase name="trust proxy ignores forwarded headers from untrusted connections" time="0.004900" classname="test"/>
+	<testcase name="trust proxy reads forwarded headers from trusted connections" time="0.003096" classname="test"/>
+	<testcase name="trust proxy with number and undefined socket remoteAddress" time="0.000810" classname="test" failure="gets host from x-forwarded-host'' !== 'fastify.test'">
+		<failure type="testCodeFailure" message="gets host from x-forwarded-host'' !== 'fastify.test'">
+[Error [ERR_TEST_FAILURE]: gets host from x-forwarded-host
+
+'' !== 'fastify.test'
+] {
+  code: 'ERR_TEST_FAILURE',
+  failureType: 'testCodeFailure',
+  cause: AssertionError [ERR_ASSERTION]: gets host from x-forwarded-host
+  
+  '' !== 'fastify.test'
+  
+      at assert.&lt;computed> [as strictEqual] (node:internal/test_runner/test:320:18)
+      at TestContext.&lt;anonymous> (/private/tmp/razor-ab/runs/hidden-sonnet/t9-fastify-forwarded-host-trust_rep0_1791902367618/razor/test/trust-proxy.test.js:252:12)
+      at Test.runInAsyncScope (node:async_hooks:214:14)
+      at Test.run (node:internal/test_runner/test:1047:25)
+      at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:744:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: '',
+    expected: 'fastify.test',
+    operator: 'strictEqual'
+  }
+}
+		</failure>
+	</testcase>
+	<testcase name="trust proxy with number and null socket remoteAddress" time="0.000195" classname="test"/>
+	<!-- tests 10 -->
+	<!-- suites 0 -->
+	<!-- pass 9 -->
+	<!-- fail 1 -->
+	<!-- cancelled 0 -->
+	<!-- skipped 0 -->
+	<!-- todo 0 -->
+	<!-- duration_ms 186.964292 -->
+</testsuites>

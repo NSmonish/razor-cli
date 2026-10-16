@@ -1,0 +1,214 @@
+diff --git a/example-application/business-logic/order-service.js b/example-application/business-logic/order-service.js
+index 461bf0d..cab3e31 100644
+--- a/example-application/business-logic/order-service.js
++++ b/example-application/business-logic/order-service.js
+@@ -9,6 +9,14 @@ const { AxiosError } = require('axios');
+ 
+ const axiosHTTPClient = axios.create({});
+ 
++const ALLOWED_STATUS_TRANSITIONS = {
++  processing: ['shipped', 'cancelled'],
++  shipped: ['delivered'],
++  delivered: ['returned'],
++  cancelled: [],
++  returned: [],
++};
++
+ module.exports.addOrder = async function (newOrder) {
+   // validation
+   if (!newOrder.productId) {
+@@ -27,6 +35,9 @@ module.exports.addOrder = async function (newOrder) {
+     );
+   }
+ 
++  // New orders always start as processing, whatever the caller sent
++  newOrder.status = 'processing';
++
+   // A little logic to calculate the total price
+   if (newOrder.isPremiumUser) {
+     newOrder.totalPrice = Math.ceil(newOrder.totalPrice * 0.9);
+@@ -54,6 +65,41 @@ module.exports.addOrder = async function (newOrder) {
+   return DBResponse;
+ };
+ 
++module.exports.updateOrderStatus = async function (id, newStatus) {
++  if (
++    typeof newStatus !== 'string' ||
++    !Object.prototype.hasOwnProperty.call(ALLOWED_STATUS_TRANSITIONS, newStatus)
++  ) {
++    throw new AppError('invalid-status', `Unknown status`, 400);
++  }
++
++  const repository = new OrderRepository();
++  const order = await repository.getOrderById(id);
++  if (!order) {
++    throw new AppError('order-not-found', `Order ${id} doesnt exist`, 404);
++  }
++
++  const from = order.status;
++  const changed =
++    ALLOWED_STATUS_TRANSITIONS[from]?.includes(newStatus) &&
++    (await repository.updateStatus(id, from, newStatus));
++  if (!changed) {
++    throw new AppError(
++      'invalid-status-transition',
++      `Cannot change status from ${from} to ${newStatus}`,
++      409,
++    );
++  }
++
++  await new MessageQueueClient().publish(
++    'order.events',
++    'order.events.status-changed',
++    { orderId: order.id, from, to: newStatus },
++  );
++
++  return await repository.getOrderById(id);
++};
++
+ module.exports.deleteOrder = async function (id) {
+   return await new OrderRepository().deleteOrder(id);
+ };
+diff --git a/example-application/data-access/migrations/20260101000000-add-order-status.js b/example-application/data-access/migrations/20260101000000-add-order-status.js
+new file mode 100644
+index 0000000..ba7a21b
+--- /dev/null
++++ b/example-application/data-access/migrations/20260101000000-add-order-status.js
+@@ -0,0 +1,11 @@
++module.exports = {
++  up: async (queryInterface, Sequelize) => {
++    await queryInterface.addColumn('Orders', 'status', {
++      type: Sequelize.STRING,
++      allowNull: false,
++      defaultValue: 'processing',
++    });
++  },
++
++  down: (queryInterface) => queryInterface.removeColumn('Orders', 'status'),
++};
+diff --git a/example-application/data-access/order-repository.js b/example-application/data-access/order-repository.js
+index d56e3e5..f5de513 100644
+--- a/example-application/data-access/order-repository.js
++++ b/example-application/data-access/order-repository.js
+@@ -42,6 +42,11 @@ module.exports = class OrderRepository {
+         isPremiumUser: {
+           type: Sequelize.BOOLEAN,
+         },
++        status: {
++          type: Sequelize.STRING,
++          allowNull: false,
++          defaultValue: 'processing',
++        },
+       });
+     }
+   }
+@@ -56,6 +61,15 @@ module.exports = class OrderRepository {
+     return addingResponse.dataValues;
+   }
+ 
++  // Changes the status only if it still equals `from`. Returns whether it changed
++  async updateStatus(id, from, to) {
++    const [affectedCount] = await orderModel.update(
++      { status: to },
++      { where: { id, status: from } },
++    );
++    return affectedCount > 0;
++  }
++
+   async deleteOrder(orderToDelete) {
+     await orderModel.destroy({ where: { id: orderToDelete } });
+     return;
+diff --git a/example-application/entry-points/api.ts b/example-application/entry-points/api.ts
+index 54fc971..d9ab2ae 100644
+--- a/example-application/entry-points/api.ts
++++ b/example-application/entry-points/api.ts
+@@ -77,6 +77,20 @@ const defineRoutes = (expressApp: express.Application) => {
+     res.json(response);
+   });
+ 
++  // change order status
++  router.patch('/:id/status', async (req, res, next) => {
++    try {
++      console.log(`Order API was called to update status of ${req.params.id}`);
++      const updatedOrder = await orderService.updateOrderStatus(
++        req.params.id,
++        req.body?.status,
++      );
++      res.json(updatedOrder);
++    } catch (error) {
++      next(error);
++    }
++  });
++
+   // delete order by id
+   router.delete('/:id', async (req, res, next) => {
+     console.log(`Order API was called to delete order ${req.params.id}`);
+diff --git a/example-application/test/orderStatus.test.ts b/example-application/test/orderStatus.test.ts
+new file mode 100644
+index 0000000..45e42ad
+--- /dev/null
++++ b/example-application/test/orderStatus.test.ts
+@@ -0,0 +1,63 @@
++import { testSetup } from './setup/test-file-setup';
++
++beforeAll(async () => {
++  await testSetup.start({
++    startAPI: true,
++    disableNetConnect: true,
++    includeTokenInHttpClient: true,
++    mockGetUserCalls: true,
++    mockMailerCalls: true,
++  });
++});
++
++beforeEach(() => {
++  testSetup.resetBeforeEach();
++});
++
++afterAll(async () => {
++  testSetup.tearDownTestFile();
++});
++
++const addOrder = async (extra = {}) => {
++  const { data } = await testSetup
++    .getHTTPClient()
++    .post('/order', { userId: 1, productId: 2, mode: 'approved', ...extra });
++  return data.id as number;
++};
++
++const patch = (id: number | string, body: unknown) =>
++  testSetup.getHTTPClient().patch(`/order/${id}/status`, body);
++
++describe('PATCH /order/:id/status', () => {
++  test('New order starts as processing even if the body says otherwise', async () => {
++    const id = await addOrder({ status: 'delivered' });
++    const { data } = await testSetup.getHTTPClient().get(`/order/${id}`);
++    expect(data.status).toBe('processing');
++  });
++
++  test('Allowed transition returns 200 with the updated order', async () => {
++    const id = await addOrder();
++    const response = await patch(id, { status: 'shipped' });
++    expect(response.status).toBe(200);
++    expect(response.data).toMatchObject({ id, status: 'shipped' });
++    const { data } = await testSetup.getHTTPClient().get(`/order/${id}`);
++    expect(data.status).toBe('shipped');
++  });
++
++  test('Disallowed transition returns 409 and keeps the status', async () => {
++    const id = await addOrder();
++    const response = await patch(id, { status: 'delivered' });
++    expect(response.status).toBe(409);
++    const { data } = await testSetup.getHTTPClient().get(`/order/${id}`);
++    expect(data.status).toBe('processing');
++  });
++
++  test.each([{ status: 'bogus' }, {}])('Invalid status %j returns 400', async (body) => {
++    const id = await addOrder();
++    expect((await patch(id, body)).status).toBe(400);
++  });
++
++  test('Unknown order returns 404', async () => {
++    expect((await patch(999999, { status: 'shipped' })).status).toBe(404);
++  });
++});

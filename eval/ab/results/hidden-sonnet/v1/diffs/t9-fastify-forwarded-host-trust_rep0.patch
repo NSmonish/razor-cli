@@ -1,0 +1,88 @@
+diff --git a/lib/request.js b/lib/request.js
+index f1f4a5e..62608dd 100644
+--- a/lib/request.js
++++ b/lib/request.js
+@@ -100,6 +100,14 @@ function buildRequestWithTrustProxy (R, trustProxy) {
+   const _Request = buildRegularRequest(R)
+   const proxyFn = getTrustProxyFn(trustProxy)
+ 
++  // Whether the direct peer of the connection is a trusted proxy
++  function isFromTrustedProxy (request) {
++    if (proxyFn === null) return true
++    const addr = request.raw.socket?.remoteAddress
++    if (addr === undefined) return false
++    return Boolean(proxyFn(addr, 0))
++  }
++
+   // This is a more optimized version of decoration
+   _Request[kHasBeenDecorated] = true
+ 
+@@ -117,7 +125,7 @@ function buildRequestWithTrustProxy (R, trustProxy) {
+     },
+     host: {
+       get () {
+-        if (this.ip !== undefined && this.headers['x-forwarded-host']) {
++        if (this.headers['x-forwarded-host'] && isFromTrustedProxy(this)) {
+           return getLastEntryInMultiHeaderValue(this.headers['x-forwarded-host'])
+         }
+         /**
+@@ -131,7 +139,7 @@ function buildRequestWithTrustProxy (R, trustProxy) {
+     },
+     protocol: {
+       get () {
+-        if (this.headers['x-forwarded-proto']) {
++        if (this.headers['x-forwarded-proto'] && isFromTrustedProxy(this)) {
+           return getLastEntryInMultiHeaderValue(this.headers['x-forwarded-proto'])
+         }
+         if (this.socket) {
+diff --git a/test/trust-proxy.test.js b/test/trust-proxy.test.js
+index ae7b756..04b69b2 100644
+--- a/test/trust-proxy.test.js
++++ b/test/trust-proxy.test.js
+@@ -160,3 +160,46 @@ test('trust proxy protocol', async t => {
+   await fetchForwardedRequest(fastifyServer, '1.1.1.1', '/trustproxynoprotocol', undefined)
+   await fetchForwardedRequest(fastifyServer, '1.1.1.1', '/trustproxyprotocols', 'ipsum, dolor')
+ })
++
++for (const [name, getTp] of [
++  ['string', () => '10.0.0.1'],
++  ['array', () => ['10.0.0.1']],
++  ['comma-separated string', () => '10.0.0.1, 10.0.0.2'],
++  ['function', () => (addr) => addr === '10.0.0.1'],
++  ['number 0 hops (not trusted)', () => 0]
++]) {
++  test(`untrusted peer cannot spoof host/protocol (${name})`, async t => {
++    const app = fastify({ trustProxy: getTp() })
++    t.after(() => app.close())
++    app.get('/', (req, reply) => {
++      reply.send({ host: req.host, hostname: req.hostname, protocol: req.protocol })
++    })
++    const res = await app.inject({
++      url: '/',
++      headers: { host: 'real.test', 'x-forwarded-host': 'evil.com', 'x-forwarded-proto': 'https' }
++    })
++    t.assert.deepStrictEqual(res.json(), { host: 'real.test', hostname: 'real.test', protocol: 'http' })
++  })
++}
++
++for (const [name, tp] of [
++  ['string', '10.0.0.1'],
++  ['array', ['10.0.0.1']],
++  ['function', (addr) => addr === '10.0.0.1'],
++  ['number', 1],
++  ['true', true]
++]) {
++  test(`trusted peer host/protocol are forwarded (${name})`, async t => {
++    const app = fastify({ trustProxy: tp })
++    t.after(() => app.close())
++    app.get('/', (req, reply) => {
++      reply.send({ host: req.host, hostname: req.hostname, protocol: req.protocol })
++    })
++    const res = await app.inject({
++      url: '/',
++      remoteAddress: '10.0.0.1',
++      headers: { host: 'real.test', 'x-forwarded-host': 'fwd.test', 'x-forwarded-proto': 'https' }
++    })
++    t.assert.deepStrictEqual(res.json(), { host: 'fwd.test', hostname: 'fwd.test', protocol: 'https' })
++  })
++}

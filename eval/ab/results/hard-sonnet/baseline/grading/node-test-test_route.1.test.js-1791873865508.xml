@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<testsuites>
+	<testsuite name="route" time="0.116260" disabled="0" errors="0" tests="10" failures="0" skipped="0" hostname="Sungjoons-MacBook-Pro-7.local">
+		<testcase name="route - get" time="0.064490" classname="test"/>
+		<testcase name="missing schema - route" time="0.009908" classname="test"/>
+		<testcase name="invalid handler attribute - route" time="0.000633" classname="test"/>
+		<testcase name="Add Multiple methods per route all uppercase" time="0.011316" classname="test"/>
+		<testcase name="Add Multiple methods per route all lowercase" time="0.009008" classname="test"/>
+		<testcase name="Add Multiple methods per route mixed uppercase and lowercase" time="0.005641" classname="test"/>
+		<testcase name="Add invalid Multiple methods per route" time="0.000900" classname="test"/>
+		<testcase name="Add method" time="0.000269" classname="test"/>
+		<testcase name="Add additional multiple methods to existing route" time="0.008876" classname="test"/>
+		<testcase name="cannot add another route after binding" time="0.003763" classname="test"/>
+	</testsuite>
+	<testcase name="invalid schema - route" time="0.015158" classname="test"/>
+	<!-- tests 12 -->
+	<!-- suites 0 -->
+	<!-- pass 12 -->
+	<!-- fail 0 -->
+	<!-- cancelled 0 -->
+	<!-- skipped 0 -->
+	<!-- todo 0 -->
+	<!-- duration_ms 212.440417 -->
+</testsuites>

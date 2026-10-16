@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="utf-8"?>
+<testsuites>
+	<testcase name="Reply error handling - code: 400" time="0.037148" classname="test"/>
+	<testcase name="Reply error handling - code: 401" time="0.002112" classname="test"/>
+	<testcase name="Reply error handling - code: 402" time="0.001627" classname="test"/>
+	<testcase name="Reply error handling - code: 403" time="0.001120" classname="test"/>
+	<testcase name="Reply error handling - code: 404" time="0.001641" classname="test"/>
+	<testcase name="Reply error handling - code: 405" time="0.002011" classname="test"/>
+	<testcase name="Reply error handling - code: 406" time="0.001427" classname="test"/>
+	<testcase name="Reply error handling - code: 407" time="0.001056" classname="test"/>
+	<testcase name="Reply error handling - code: 408" time="0.003086" classname="test"/>
+	<testcase name="Reply error handling - code: 409" time="0.001255" classname="test"/>
+	<testcase name="Reply error handling - code: 410" time="0.000906" classname="test"/>
+	<testcase name="Reply error handling - code: 411" time="0.001596" classname="test"/>
+	<testcase name="Reply error handling - code: 412" time="0.000684" classname="test"/>
+	<testcase name="Reply error handling - code: 413" time="0.000869" classname="test"/>
+	<testcase name="Reply error handling - code: 414" time="0.000742" classname="test"/>
+	<testcase name="Reply error handling - code: 415" time="0.000622" classname="test"/>
+	<testcase name="Reply error handling - code: 416" time="0.000653" classname="test"/>
+	<testcase name="Reply error handling - code: 417" time="0.000775" classname="test"/>
+	<testcase name="Reply error handling - code: 418" time="0.000709" classname="test"/>
+	<testcase name="Reply error handling - code: 421" time="0.000758" classname="test"/>
+	<testcase name="Reply error handling - code: 422" time="0.000735" classname="test"/>
+	<testcase name="Reply error handling - code: 423" time="0.000758" classname="test"/>
+	<testcase name="Reply error handling - code: 424" time="0.000651" classname="test"/>
+	<testcase name="Reply error handling - code: 425" time="0.001706" classname="test"/>
+	<testcase name="Reply error handling - code: 426" time="0.000754" classname="test"/>
+	<testcase name="Reply error handling - code: 428" time="0.000834" classname="test"/>
+	<testcase name="Reply error handling - code: 429" time="0.000702" classname="test"/>
+	<testcase name="Reply error handling - code: 431" time="0.000689" classname="test"/>
+	<testcase name="Reply error handling - code: 451" time="0.000658" classname="test"/>
+	<testcase name="Reply error handling - code: 500" time="0.000798" classname="test"/>
+	<testcase name="Reply error handling - code: 501" time="0.000625" classname="test"/>
+	<testcase name="Reply error handling - code: 502" time="0.000681" classname="test"/>
+	<testcase name="Reply error handling - code: 503" time="0.000718" classname="test"/>
+	<testcase name="Reply error handling - code: 504" time="0.000633" classname="test"/>
+	<testcase name="Reply error handling - code: 505" time="0.001957" classname="test"/>
+	<testcase name="Reply error handling - code: 506" time="0.001343" classname="test"/>
+	<testcase name="Reply error handling - code: 507" time="0.000990" classname="test"/>
+	<testcase name="Reply error handling - code: 508" time="0.000950" classname="test"/>
+	<testcase name="Reply error handling - code: 509" time="0.003025" classname="test"/>
+	<testcase name="Reply error handling - code: 510" time="0.000720" classname="test"/>
+	<testcase name="Reply error handling - code: 511" time="0.000587" classname="test"/>
+	<testcase name="preHandler hook error handling with external code" time="0.000878" classname="test"/>
+	<testcase name="onRequest hook error handling with external done" time="0.000659" classname="test"/>
+	<testcase name="Should reply 400 on client error" time="0.006568" classname="test"/>
+	<testcase name="Should set the response from client error handler" time="0.016893" classname="test"/>
+	<testcase name="Error instance sets HTTP status code" time="0.000915" classname="test"/>
+	<testcase name="Error status code below 400 defaults to 500" time="0.000718" classname="test"/>
+	<testcase name="Error.status property support" time="0.000675" classname="test"/>
+	<testsuite name="Support rejection with values that are not Error instances" time="0.007591" disabled="0" errors="0" tests="11" failures="0" skipped="0" hostname="Sungjoons-MacBook-Pro-7.local">
+		<testcase name="Type: number" time="0.001010" classname="test"/>
+		<testcase name="Type: string" time="0.000677" classname="test"/>
+		<testcase name="Type: object" time="0.000637" classname="test"/>
+		<testcase name="Type: object" time="0.000666" classname="test"/>
+		<testcase name="Type: object" time="0.000619" classname="test"/>
+		<testcase name="Type: undefined" time="0.000696" classname="test"/>
+		<testcase name="Type: number" time="0.000668" classname="test"/>
+		<testcase name="Type: string" time="0.000582" classname="test"/>
+		<testcase name="Type: object" time="0.000638" classname="test"/>
+		<testcase name="Type: object" time="0.000599" classname="test"/>
+		<testcase name="Type: object" time="0.000580" classname="test"/>
+	</testsuite>
+	<testcase name="invalid schema - ajv" time="0.019173" classname="test"/>
+	<testcase name="should set the status code and the headers from the error object (from route handler) (no custom error handler)" time="0.000906" classname="test"/>
+	<testcase name="should set the status code and the headers from the error object (from custom error handler)" time="0.000774" classname="test"/>
+	<testcase name="'*' should throw an error due to serializer can not handle the payload type" time="0.000875" classname="test"/>
+	<testcase name="should throw an error if the custom serializer does not serialize the payload to a valid type" time="0.000827" classname="test"/>
+	<testcase name="should not set headers or status code for custom error handler" time="0.000828" classname="test"/>
+	<testcase name="error thrown by custom error handler routes to default error handler" time="0.000724" classname="test"/>
+	<testcase name="allow re-thrown error to default error handler when route handler is async and error handler is sync" time="0.000718" classname="test"/>
+	<testcase name="should throw error if error code is undefined" time="0.000697" classname="test"/>
+	<testcase name="should throw error if error code is null" time="0.000568" classname="test"/>
+	<testcase name="should throw error if error code is error_code" time="0.000538" classname="test"/>
+	<testcase name="should throw error if error code is 0" time="0.000620" classname="test"/>
+	<testcase name="should throw error if error code is 1" time="0.000573" classname="test"/>
+	<testcase name="should throw error if error code is 99" time="0.000537" classname="test"/>
+	<testcase name="should throw error if error code is 600" time="0.001018" classname="test"/>
+	<testcase name="should throw error if error code is 700" time="0.000652" classname="test"/>
+	<testcase name="error handler is triggered when a string is thrown from sync handler" time="0.000718" classname="test"/>
+	<testcase name="status code should be set to 500 and return an error json payload if route handler throws any non Error object expression" time="0.000993" classname="test"/>
+	<testcase name="should preserve the status code set by the user if an expression is thrown in a sync route" time="0.000659" classname="test"/>
+	<testcase name="should trigger error handlers if a sync route throws any non-error object" time="0.000651" classname="test"/>
+	<testcase name="should trigger error handlers if a sync route throws undefined" time="0.000648" classname="test"/>
+	<testcase name="setting content-type on reply object should not hang the server case 1" time="0.000944" classname="test"/>
+	<testcase name="setting content-type on reply object should not hang the server case 2" time="0.000795" classname="test"/>
+	<testcase name="setting content-type on reply object should not hang the server case 3" time="0.003267" classname="test"/>
+	<testcase name="pipe stream inside error handler should not cause error" time="0.002486" classname="test"/>
+	<testcase name="should catch error when setting invalid header on async preSerializeation hook" time="0.000860" classname="test"/>
+	<testcase name="should catch error when setting invalid header on async onSend hook" time="0.000712" classname="test"/>
+	<!-- tests 86 -->
+	<!-- suites 1 -->
+	<!-- pass 86 -->
+	<!-- fail 0 -->
+	<!-- cancelled 0 -->
+	<!-- skipped 0 -->
+	<!-- todo 0 -->
+	<!-- duration_ms 239.60175 -->
+</testsuites>

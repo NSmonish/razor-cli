@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<testsuites>
+	<testcase name="dependencies (array form) is lowercased" time="0.079299" classname="test"/>
+	<testcase name="dependencies subschema form is lowercased" time="0.025747" classname="test"/>
+	<testcase name="dependentRequired and dependentSchemas are lowercased" time="0.000692" classname="test"/>
+	<testcase name="nested subschemas are lowercased" time="0.039085" classname="test"/>
+	<testcase name="local $ref definitions are lowercased, without warning" time="0.017040" classname="test"/>
+	<testcase name="local $ref pointing at a header property is lowercased" time="0.011129" classname="test"/>
+	<testcase name="canonical schema behaves like the lowercase one" time="0.039615" classname="test"/>
+	<testcase name="the user supplied schema is not mutated" time="0.007624" classname="test"/>
+	<testcase name="external shared $ref emits FSTSEC002" time="0.006020" classname="test"/>
+	<!-- tests 9 -->
+	<!-- suites 0 -->
+	<!-- pass 9 -->
+	<!-- fail 0 -->
+	<!-- cancelled 0 -->
+	<!-- skipped 0 -->
+	<!-- todo 0 -->
+	<!-- duration_ms 316.600042 -->
+</testsuites>

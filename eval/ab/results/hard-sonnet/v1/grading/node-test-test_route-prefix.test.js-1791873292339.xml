@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<testsuites>
+	<testcase name="Prefix options should add a prefix for all the routes inside a register / 1" time="0.041065" classname="test"/>
+	<testcase name="Prefix options should add a prefix for all the routes inside a register / 2" time="0.002665" classname="test"/>
+	<testcase name="Prefix options should add a prefix for all the chained routes inside a register / 3" time="0.001879" classname="test"/>
+	<testcase name="Prefix should support parameters as well" time="0.001983" classname="test"/>
+	<testcase name="Prefix should support /" time="0.002804" classname="test"/>
+	<testcase name="Prefix without /" time="0.002670" classname="test"/>
+	<testcase name="Prefix with trailing /" time="0.002279" classname="test"/>
+	<testcase name="Prefix with trailing / and nested prefix without leading /" time="0.001658" classname="test"/>
+	<testcase name="Prefix works multiple levels deep" time="0.002429" classname="test"/>
+	<testcase name="Different register - encapsulation check" time="0.003339" classname="test"/>
+	<testcase name="Can retrieve prefix within encapsulated instances" time="0.001815" classname="test"/>
+	<testcase name="matches both /prefix and /prefix/ with a / route" time="0.001116" classname="test"/>
+	<testcase name="prefix &amp;quot;/prefix/&amp;quot; does not match &amp;quot;/prefix&amp;quot; with a / route" time="0.001391" classname="test"/>
+	<testcase name="matches both /prefix and /prefix/ with a / route - ignoreTrailingSlash: true" time="0.001043" classname="test"/>
+	<testcase name="matches both /prefix and /prefix/ with a / route - ignoreDuplicateSlashes: true" time="0.001328" classname="test"/>
+	<testcase name="matches both /prefix and /prefix/  with a / route - prefixTrailingSlash: &amp;quot;both&amp;quot;, ignoreTrailingSlash: false" time="0.001380" classname="test"/>
+	<testcase name="reports the canonical route url for hidden prefix trailing slash route" time="0.001836" classname="test"/>
+	<testcase name="matches both /prefix and /prefix/  with a / route - prefixTrailingSlash: &amp;quot;both&amp;quot;, ignoreDuplicateSlashes: false" time="0.001015" classname="test"/>
+	<testcase name="matches both /prefix and /prefix/ with a / route - ignoreTrailingSlash: true, ignoreDuplicateSlashes: true" time="0.001056" classname="test"/>
+	<testcase name="matches both /prefix and /prefix/ with a / route - ignoreTrailingSlash: true, ignoreDuplicateSlashes: false" time="0.000837" classname="test"/>
+	<testcase name="returns 404 status code with /prefix/ and / route - prefixTrailingSlash: &amp;quot;both&amp;quot; (default), ignoreTrailingSlash: true" time="0.001072" classname="test"/>
+	<testcase name="matches both /prefix and /prefix/  with a / route - prefixTrailingSlash: &amp;quot;both&amp;quot;, ignoreDuplicateSlashes: true" time="0.002189" classname="test"/>
+	<testcase name="matches both /prefix and /prefix/  with a / route - prefixTrailingSlash: &amp;quot;both&amp;quot;, ignoreTrailingSlash: true, ignoreDuplicateSlashes: true" time="0.000841" classname="test"/>
+	<testcase name="matches both /prefix and /prefix/  with a / route - prefixTrailingSlash: &amp;quot;both&amp;quot;, ignoreDuplicateSlashes: true" time="0.000816" classname="test"/>
+	<testcase name="matches only /prefix  with a / route - prefixTrailingSlash: &amp;quot;no-slash&amp;quot;, ignoreTrailingSlash: false" time="0.000974" classname="test"/>
+	<testcase name="matches only /prefix  with a / route - prefixTrailingSlash: &amp;quot;no-slash&amp;quot;, ignoreDuplicateSlashes: false" time="0.001417" classname="test"/>
+	<testcase name="matches only /prefix/  with a / route - prefixTrailingSlash: &amp;quot;slash&amp;quot;, ignoreTrailingSlash: false" time="0.000941" classname="test"/>
+	<testcase name="calls onRoute only once when prefixing" time="0.000759" classname="test"/>
+	<!-- tests 28 -->
+	<!-- suites 0 -->
+	<!-- pass 28 -->
+	<!-- fail 0 -->
+	<!-- cancelled 0 -->
+	<!-- skipped 0 -->
+	<!-- todo 0 -->
+	<!-- duration_ms 171.931667 -->
+</testsuites>

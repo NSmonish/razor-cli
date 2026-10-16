@@ -1,0 +1,22 @@
+{
+  "model": "claude-opus-5-5",
+  "effort": "medium",
+  "reps": 1,
+  "timeout_min": 20,
+  "max_budget_usd": 10,
+  "claude_code_version": "2.1.296 (Claude Code)",
+  "razor_commit": "bf9a7da",
+  "tasks": [
+    {
+      "id": "t2-delete-order",
+      "fingerprint": "f90e7e880556fe74"
+    },
+    {
+      "id": "t3-user-service-timeout",
+      "fingerprint": "1a103e495c98b6b5"
+    }
+  ],
+  "started_at": "2026-10-13T04:38:15.733Z",
+  "razor_hint": null,
+  "verify_instruction": null
+}

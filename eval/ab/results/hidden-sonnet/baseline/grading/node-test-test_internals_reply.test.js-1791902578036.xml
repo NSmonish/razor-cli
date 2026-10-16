@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="utf-8"?>
+<testsuites>
+	<testcase name="Once called, Reply should return an object with methods" time="0.001428" classname="test"/>
+	<testcase name="reply.send will logStream error and destroy the stream" time="0.000836" classname="test"/>
+	<testcase name="reply.send throw with circular JSON" time="0.000164" classname="test"/>
+	<testcase name="reply.send returns itself" time="0.000180" classname="test"/>
+	<testcase name="reply.serializer should set a custom serializer" time="0.000152" classname="test"/>
+	<testcase name="reply.serializer should support running preSerialization hooks" time="0.038183" classname="test"/>
+	<testcase name="reply.serialize should serialize payload" time="0.000121" classname="test"/>
+	<testcase name="reply.serialize should serialize payload with a custom serializer" time="0.000259" classname="test"/>
+	<testcase name="reply.serialize should serialize payload with a context default serializer" time="0.000297" classname="test"/>
+	<testcase name="reply.serialize should serialize payload with Fastify instance" time="0.007258" classname="test"/>
+	<testsuite name="within an instance" time="0.051435" disabled="0" errors="0" tests="14" failures="0" skipped="0" hostname="Sungjoons-MacBook-Pro-7.local">
+		<testcase name="custom serializer should be used" time="0.017663" classname="test"/>
+		<testcase name="status code and content-type should be correct" time="0.002216" classname="test"/>
+		<testcase name="auto status code should be 200" time="0.001251" classname="test"/>
+		<testcase name="auto type should be text/plain" time="0.001063" classname="test"/>
+		<testcase name="redirect to `/` - 1" time="0.002161" classname="test"/>
+		<testcase name="redirect to `/` - 2" time="0.001453" classname="test"/>
+		<testcase name="redirect to `/` - 3" time="0.002124" classname="test"/>
+		<testcase name="redirect to `/` - 4" time="0.001701" classname="test"/>
+		<testcase name="redirect to `/` - 5" time="0.001317" classname="test"/>
+		<testcase name="redirect to `/` - 6" time="0.002320" classname="test"/>
+		<testcase name="redirect to `/` - 7" time="0.001619" classname="test"/>
+		<testcase name="redirect to `/` - 8" time="0.001118" classname="test"/>
+		<testcase name="redirect to `/` - 9" time="0.001105" classname="test"/>
+		<testcase name="redirect with async function to `/` - 10" time="0.001019" classname="test"/>
+	</testsuite>
+	<testcase name="buffer without content type should send a application/octet-stream and raw buffer" time="0.006897" classname="test"/>
+	<testcase name="Uint8Array without content type should send a application/octet-stream and raw buffer" time="0.003371" classname="test"/>
+	<testcase name="Uint16Array without content type should send a application/octet-stream and raw buffer" time="0.002203" classname="test"/>
+	<testcase name="TypedArray with content type should not send application/octet-stream" time="0.002478" classname="test"/>
+	<testcase name="buffer with content type should not send application/octet-stream" time="0.003035" classname="test"/>
+	<testcase name="stream with content type should not send application/octet-stream" time="0.005147" classname="test"/>
+	<testcase name="stream without content type should not send application/octet-stream" time="0.004366" classname="test"/>
+	<testcase name="stream using reply.raw.writeHead should return customize headers" time="0.003840" classname="test"/>
+	<testcase name="plain string without content type should send a text/plain" time="0.002960" classname="test"/>
+	<testcase name="plain string with content type should be sent unmodified" time="0.003053" classname="test"/>
+	<testcase name="plain string with content type and custom serializer should be serialized" time="0.004643" classname="test"/>
+	<testcase name="plain string with content type application/json should NOT be serialized as json" time="0.006179" classname="test"/>
+	<testcase name="plain string with custom json content type should NOT be serialized as json" time="0.005939" classname="test"/>
+	<testcase name="non-string with content type application/json SHOULD be serialized as json" time="0.003368" classname="test"/>
+	<testcase name="non-string with custom json's content-type SHOULD be serialized as json" time="0.002871" classname="test"/>
+	<testcase name="non-string with custom json content type SHOULD be serialized as json" time="0.006431" classname="test"/>
+	<testcase name="error object with a content type that is not application/json should work" time="0.001729" classname="test"/>
+	<testcase name="undefined payload should be sent as-is" time="0.002791" classname="test"/>
+	<testcase name="for HEAD method, no body should be sent but content-length should be" time="0.003328" classname="test"/>
+	<testcase name="reply.send(new NotFound()) should not invoke the 404 handler" time="0.003681" classname="test"/>
+	<testcase name="reply can set multiple instances of same header" time="0.002754" classname="test"/>
+	<testcase name="reply.hasHeader returns correct values" time="0.003841" classname="test"/>
+	<testcase name="reply.getHeader returns correct values" time="0.003015" classname="test"/>
+	<testcase name="reply.getHeader returns raw header if there is not in the reply headers" time="0.000083" classname="test"/>
+	<testcase name="reply.getHeaders returns correct values" time="0.000809" classname="test"/>
+	<testcase name="reply.removeHeader can remove the value" time="0.002433" classname="test"/>
+	<testcase name="reply.removeHeader removes raw headers" time="0.002475" classname="test"/>
+	<testcase name="reply.removeHeader removes layered headers" time="0.002627" classname="test"/>
+	<testcase name="reply.removeHeader does not throw after headers are sent" time="0.002092" classname="test"/>
+	<testcase name="reply.header can reset the value" time="0.002276" classname="test"/>
+	<testcase name="reply.hasHeader computes raw and fastify headers" time="0.002104" classname="test"/>
+	<testcase name="Reply should handle JSON content type with a charset" time="0.002966" classname="test"/>
+	<testcase name="Content type and charset set previously" time="0.000813" classname="test"/>
+	<testcase name=".status() is an alias for .code()" time="0.002272" classname="test"/>
+	<testcase name=".statusCode is getter and setter" time="0.000628" classname="test"/>
+	<testcase name="reply.header setting multiple cookies as multiple Set-Cookie headers" time="0.002683" classname="test"/>
+	<testcase name="should throw when trying to modify the reply.sent property" time="0.000670" classname="test"/>
+	<testcase name="reply.elapsedTime should return 0 before the timer is initialised on the reply by setting up response listeners" time="0.000064" classname="test"/>
+	<testcase name="reply.elapsedTime should return a number greater than 0 after the timer is initialised on the reply by setting up response listeners" time="0.000741" classname="test"/>
+	<testcase name="reply.elapsedTime should return the time since a request started while inflight" time="0.000690" classname="test"/>
+	<testcase name="reply.elapsedTime should return the same value after a request is finished" time="0.000623" classname="test"/>
+	<testcase name="reply should use the custom serializer" time="0.000630" classname="test"/>
+	<testcase name="reply should use the right serializer in encapsulated context" time="0.001272" classname="test"/>
+	<testcase name="reply should use the right serializer in deep encapsulated context" time="0.001732" classname="test"/>
+	<testcase name="reply should use the route serializer" time="0.000699" classname="test"/>
+	<testcase name="cannot set the replySerializer when the server is running" time="0.001721" classname="test"/>
+	<testcase name="reply should not call the custom serializer for errors and not found" time="0.001160" classname="test"/>
+	<testsuite name="reply.then" time="0.000658" disabled="0" errors="0" tests="4" failures="0" skipped="0" hostname="Sungjoons-MacBook-Pro-7.local">
+		<testcase name="without an error" time="0.000183" classname="test"/>
+		<testcase name="with an error" time="0.000150" classname="test"/>
+		<testcase name="with error but without reject callback" time="0.000066" classname="test"/>
+		<testcase name="with error, without reject callback, with logger" time="0.000108" classname="test"/>
+	</testsuite>
+	<testcase name="reply.sent should read from response.writableEnded if it is defined" time="0.000043" classname="test"/>
+	<testcase name="redirect to an invalid URL should not crash the server" time="0.005004" classname="test"/>
+	<testcase name="invalid response headers should not crash the server" time="0.002642" classname="test"/>
+	<testcase name="invalid response headers when sending back an error" time="0.002179" classname="test"/>
+	<testcase name="invalid response headers and custom error handler" time="0.002466" classname="test"/>
+	<testcase name="reply.send will intercept ERR_HTTP_HEADERS_SENT and log an error message" time="0.000168" classname="test"/>
+	<testcase name="Uint8Array view of ArrayBuffer returns correct byteLength" time="0.003769" classname="test"/>
+	<testcase name="reply.send should not treat charset= inside a quoted parameter value as an already-declared charset" time="0.000862" classname="test"/>
+	<testcase name="reply.removeHeader after headers are sent neither throws nor breaks the response" time="0.002268" classname="test"/>
+	<!-- tests 86 -->
+	<!-- suites 0 -->
+	<!-- pass 86 -->
+	<!-- fail 0 -->
+	<!-- cancelled 0 -->
+	<!-- skipped 0 -->
+	<!-- todo 0 -->
+	<!-- duration_ms 330.3255 -->
+</testsuites>

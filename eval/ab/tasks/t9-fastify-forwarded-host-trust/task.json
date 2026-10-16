@@ -1,0 +1,78 @@
+{
+  "id": "t9-fastify-forwarded-host-trust",
+  "repo": "fastify",
+  "commit": "a22217f9420f70017a419d8e18b2a3141ab27989",
+  "source_fix": "fastify/fastify@4e1db5bd (2026-03-05, GHSA-444r-cwp2-x5xf): gate host and protocol getters on proxy trust function; plus its follow-up fastify/fastify@8dee9be0 (2026-03-28, #6613, issue #6606) which repaired the regression the first fix shipped",
+  "tags": [
+    "real-fix",
+    "security",
+    "hidden-acs",
+    "large-repo",
+    "hard"
+  ],
+  "prompt": "prompt.md",
+  "solution": "solution.patch",
+  "supp_files": {
+    "test/trust-proxy.test.js": "supp/trust-proxy.test.js"
+  },
+  "regression_paths": [
+    "test/trust-proxy.test.js",
+    "test/internals/request.test.js",
+    "test/url-rewriting.test.js"
+  ],
+  "acceptance": [
+    {
+      "id": "AC1",
+      "visibility": "shown",
+      "desc": "a direct connection from an untrusted peer cannot spoof request.host / hostname / protocol via X-Forwarded-Host / X-Forwarded-Proto",
+      "source": "orig",
+      "file": "test/trust-proxy.test.js",
+      "title": "trust proxy ignores forwarded headers from untrusted connections",
+      "null_expect": "fail"
+    },
+    {
+      "id": "AC2",
+      "visibility": "shown",
+      "desc": "a trusted proxy's forwarded host and protocol are still used (guard)",
+      "source": "orig",
+      "file": "test/trust-proxy.test.js",
+      "title": "trust proxy reads forwarded headers from trusted connections",
+      "null_expect": "pass"
+    },
+    {
+      "id": "AC3",
+      "visibility": "hidden",
+      "desc": "trustProxy as a hop count keeps working when the socket's remote address is undefined (IISNode): ip from X-Forwarded-For, host from X-Forwarded-Host (guard; the first upstream fix broke this)",
+      "source": "orig",
+      "file": "test/trust-proxy.test.js",
+      "title": "trust proxy with number and undefined socket remoteAddress",
+      "null_expect": "pass",
+      "leak_strings": [
+        "iisnode",
+        "remoteaddress",
+        "undefined socket",
+        "null socket"
+      ]
+    },
+    {
+      "id": "AC4",
+      "visibility": "hidden",
+      "desc": "trustProxy as a hop count with a null remote address still resolves ip from X-Forwarded-For without throwing (guard)",
+      "source": "orig",
+      "file": "test/trust-proxy.test.js",
+      "title": "trust proxy with number and null socket remoteAddress",
+      "null_expect": "pass"
+    }
+  ],
+  "decoys": [
+    {
+      "patch": "decoy-upstream-first-fix.patch",
+      "desc": "the first upstream fix (4e1db5bd), which shipped a regression for hop-count trustProxy",
+      "expect": {
+        "AC1": "pass",
+        "AC2": "pass",
+        "AC3": "fail"
+      }
+    }
+  ]
+}

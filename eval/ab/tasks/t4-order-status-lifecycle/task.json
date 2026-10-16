@@ -1,0 +1,30 @@
+{
+  "id": "t4-order-status-lifecycle",
+  "repo": "nodejs-testing-best-practices",
+  "tags": ["feature", "long-horizon", "multi-layer"],
+  "prompt": "prompt.md",
+  "solution": "solution.patch",
+  "supp_files": {
+    "example-application/test/ab-supp.t4.test.ts": "supp/ab-supp.t4.test.ts"
+  },
+  "acceptance": [
+    { "id": "AC1", "desc": "new order starts as processing, ignoring the status sent", "source": "supp",
+      "file": "example-application/test/ab-supp.t4.test.ts", "title": "AC1: a new order starts as processing, whatever status the request sent", "null_expect": "fail" },
+    { "id": "AC2", "desc": "processing -> shipped: 200 with updated order, persisted", "source": "supp",
+      "file": "example-application/test/ab-supp.t4.test.ts", "title": "AC2: processing -> shipped responds 200 with the updated order and is persisted", "null_expect": "fail" },
+    { "id": "AC3", "desc": "shipped -> delivered -> returned and processing -> cancelled allowed", "source": "supp",
+      "file": "example-application/test/ab-supp.t4.test.ts", "title": "AC3: the full chain shipped -> delivered -> returned and processing -> cancelled are allowed", "null_expect": "fail" },
+    { "id": "AC4", "desc": "disallowed transition -> 409, status unchanged", "source": "supp",
+      "file": "example-application/test/ab-supp.t4.test.ts", "title": "AC4: a disallowed transition responds 409 and leaves the status unchanged", "null_expect": "fail" },
+    { "id": "AC5", "desc": "unknown or missing status value -> 400", "source": "supp",
+      "file": "example-application/test/ab-supp.t4.test.ts", "title": "AC5: an unknown status value responds 400", "null_expect": "fail" },
+    { "id": "AC6", "desc": "unknown order id -> 404 (guard: the untouched app 404s too)", "source": "supp",
+      "file": "example-application/test/ab-supp.t4.test.ts", "title": "AC6: changing the status of an order that does not exist responds 404", "null_expect": "pass" },
+    { "id": "AC7", "desc": "status-changed event published with {orderId, from, to}", "source": "supp",
+      "file": "example-application/test/ab-supp.t4.test.ts", "title": "AC7: a successful change publishes {orderId, from, to} to order.events / order.events.status-changed", "null_expect": "fail" },
+    { "id": "AC8", "desc": "status stored in Orders.status column (raw SQL)", "source": "supp",
+      "file": "example-application/test/ab-supp.t4.test.ts", "title": "AC8: the status is stored in a status column of the Orders table", "null_expect": "fail" },
+    { "id": "AC9", "desc": "existing migration file not edited (guard)", "source": "cmd",
+      "cmd": ["git", "diff", "--quiet", "HEAD", "--", "example-application/data-access/migrations/20191229152126-entire-schema.js"], "null_expect": "pass" }
+  ]
+}

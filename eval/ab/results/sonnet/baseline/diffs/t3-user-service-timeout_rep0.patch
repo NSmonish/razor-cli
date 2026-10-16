@@ -1,0 +1,65 @@
+diff --git a/example-application/business-logic/order-service.js b/example-application/business-logic/order-service.js
+index 731719a..1b1fbb1 100644
+--- a/example-application/business-logic/order-service.js
++++ b/example-application/business-logic/order-service.js
+@@ -62,14 +62,52 @@ module.exports.getOrder = async function (id) {
+   return await new OrderRepository().getOrderById(id);
+ };
+ 
++const DEFAULT_HTTP_TIMEOUT_MS = 2000;
++
++// Read on each call so a changed HTTP_TIMEOUT applies without a restart
++function getHttpTimeoutMs() {
++  const timeout = Number(process.env.HTTP_TIMEOUT);
++  return Number.isFinite(timeout) && timeout > 0
++    ? timeout
++    : DEFAULT_HTTP_TIMEOUT_MS;
++}
++
+ async function getUserFromUsersService(userId) {
+-  const getUserResponse = await axiosHTTPClient.get(
+-    `http://localhost/user/${userId}`,
+-    {
+-      validateStatus: (status) => {
+-        return status < 500;
++  const timeoutMs = getHttpTimeoutMs();
++  // The abort timer bounds the whole call, not just socket inactivity
++  const abortController = new AbortController();
++  let timedOut = false;
++  const timer = setTimeout(() => {
++    timedOut = true;
++    abortController.abort();
++  }, timeoutMs);
++
++  try {
++    const getUserResponse = await axiosHTTPClient.get(
++      `http://localhost/user/${userId}`,
++      {
++        timeout: timeoutMs,
++        signal: abortController.signal,
++        validateStatus: (status) => {
++          return status < 500;
++        },
+       },
+-    },
+-  );
+-  return getUserResponse.data;
++    );
++    return getUserResponse.data;
++  } catch (error) {
++    if (
++      timedOut ||
++      error.code === 'ECONNABORTED' ||
++      error.code === 'ETIMEDOUT'
++    ) {
++      throw new AppError(
++        'user-service-timeout',
++        `The users service did not respond within ${timeoutMs}ms`,
++        503,
++      );
++    }
++    throw error;
++  } finally {
++    clearTimeout(timer);
++  }
+ }

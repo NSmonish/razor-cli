@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<testsuites>
+	<testcase name="schema.body = false rejects every request" time="0.043082" classname="test"/>
+	<testcase name="custom validatorCompiler receives false for body" time="0.001588" classname="test"/>
+	<testcase name="null schema.body fails ready()" time="0.001649" classname="test"/>
+	<testcase name="schema.querystring = false rejects every request" time="0.002292" classname="test"/>
+	<testcase name="custom validatorCompiler receives false for querystring" time="0.000890" classname="test"/>
+	<testcase name="null schema.querystring fails ready()" time="0.001026" classname="test"/>
+	<testcase name="schema.query = false rejects every request" time="0.002567" classname="test"/>
+	<testcase name="custom validatorCompiler receives false for query" time="0.000800" classname="test"/>
+	<testcase name="null schema.query fails ready()" time="0.002181" classname="test"/>
+	<testcase name="schema.params = false rejects every request" time="0.001742" classname="test"/>
+	<testcase name="custom validatorCompiler receives false for params" time="0.000636" classname="test"/>
+	<testcase name="null schema.params fails ready()" time="0.001546" classname="test"/>
+	<testcase name="schema.headers = false rejects every request" time="0.002083" classname="test"/>
+	<testcase name="custom validatorCompiler receives false for headers" time="0.000788" classname="test"/>
+	<testcase name="null schema.headers fails ready()" time="0.000990" classname="test"/>
+	<testcase name="query and querystring together still throw, even when false" time="0.000887" classname="test"/>
+	<testcase name="FSTWRN001 is emitted for undefined schemas but not for false" time="0.003517" classname="test"/>
+	<!-- tests 17 -->
+	<!-- suites 0 -->
+	<!-- pass 17 -->
+	<!-- fail 0 -->
+	<!-- cancelled 0 -->
+	<!-- skipped 0 -->
+	<!-- todo 0 -->
+	<!-- duration_ms 144.620708 -->
+</testsuites>

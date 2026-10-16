@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="utf-8"?>
+<testsuites>
+	<testcase name="preHandler" time="0.046610" classname="test"/>
+	<testcase name="preHandler option should be called after preHandler hook" time="0.002058" classname="test"/>
+	<testcase name="preHandler option could accept an array of functions" time="0.001751" classname="test"/>
+	<testcase name="preHandler option could accept an array of async functions" time="0.001677" classname="test"/>
+	<testcase name="preHandler option does not interfere with preHandler hook" time="0.001580" classname="test"/>
+	<testcase name="onSend" time="0.002023" classname="test"/>
+	<testcase name="onSend option should be called after onSend hook" time="0.001426" classname="test"/>
+	<testcase name="onSend option could accept an array of functions" time="0.002223" classname="test"/>
+	<testcase name="onSend option could accept an array of async functions" time="0.002427" classname="test"/>
+	<testcase name="onSend option does not interfere with onSend hook" time="0.001494" classname="test"/>
+	<testcase name="onRequest" time="0.003113" classname="test"/>
+	<testcase name="onRequest option should be called after onRequest hook" time="0.001067" classname="test"/>
+	<testcase name="onRequest option could accept an array of functions" time="0.000746" classname="test"/>
+	<testcase name="onRequest option could accept an array of async functions" time="0.000813" classname="test"/>
+	<testcase name="onRequest option does not interfere with onRequest hook" time="0.000875" classname="test"/>
+	<testcase name="onResponse" time="0.000897" classname="test"/>
+	<testcase name="onResponse option should be called after onResponse hook" time="0.000711" classname="test"/>
+	<testcase name="onResponse option could accept an array of functions" time="0.000694" classname="test"/>
+	<testcase name="onResponse option could accept an array of async functions" time="0.000733" classname="test"/>
+	<testcase name="onResponse option does not interfere with onResponse hook" time="0.000892" classname="test"/>
+	<testcase name="preValidation" time="0.000779" classname="test"/>
+	<testcase name="preValidation option should be called after preValidation hook" time="0.000765" classname="test"/>
+	<testcase name="preValidation option could accept an array of functions" time="0.000805" classname="test"/>
+	<testcase name="preValidation option could accept an array of async functions" time="0.001630" classname="test"/>
+	<testcase name="preValidation option does not interfere with preValidation hook" time="0.000749" classname="test"/>
+	<testcase name="preParsing" time="0.000728" classname="test"/>
+	<testcase name="preParsing option should be called after preParsing hook" time="0.000742" classname="test"/>
+	<testcase name="preParsing option could accept an array of functions" time="0.000697" classname="test"/>
+	<testcase name="preParsing option could accept an array of async functions" time="0.000759" classname="test"/>
+	<testcase name="preParsing option does not interfere with preParsing hook" time="0.000692" classname="test"/>
+	<testcase name="preHandler option should be unique per route" time="0.001003" classname="test"/>
+	<testcase name="preHandler option should handle errors" time="0.001161" classname="test"/>
+	<testcase name="preHandler option should handle throwing objects" time="0.001024" classname="test"/>
+	<testcase name="preHandler option should handle throwing objects by default" time="0.000726" classname="test"/>
+	<testcase name="preHandler option should handle errors with custom status code" time="0.002006" classname="test"/>
+	<testcase name="preHandler option should keep the context" time="0.000991" classname="test"/>
+	<testcase name="preHandler option should keep the context (array)" time="0.000775" classname="test"/>
+	<testcase name="onRequest option should be unique per route" time="0.000843" classname="test"/>
+	<testcase name="onRequest option should handle errors" time="0.000590" classname="test"/>
+	<testcase name="onRequest option should handle throwing objects" time="0.000584" classname="test"/>
+	<testcase name="onRequest option should handle throwing objects by default" time="0.000627" classname="test"/>
+	<testcase name="onRequest option should handle errors with custom status code" time="0.000555" classname="test"/>
+	<testcase name="onRequest option should keep the context" time="0.000584" classname="test"/>
+	<testcase name="onRequest option should keep the context (array)" time="0.001570" classname="test"/>
+	<testcase name="preValidation option should be unique per route" time="0.000734" classname="test"/>
+	<testcase name="preValidation option should handle errors" time="0.000611" classname="test"/>
+	<testcase name="preValidation option should handle throwing objects" time="0.000643" classname="test"/>
+	<testcase name="preValidation option should handle throwing objects by default" time="0.000537" classname="test"/>
+	<testcase name="preValidation option should handle errors with custom status code" time="0.000665" classname="test"/>
+	<testcase name="preValidation option should keep the context" time="0.000732" classname="test"/>
+	<testcase name="preValidation option should keep the context (array)" time="0.000620" classname="test"/>
+	<testcase name="preParsing option should be unique per route" time="0.000674" classname="test"/>
+	<testcase name="preParsing option should handle errors" time="0.000504" classname="test"/>
+	<testcase name="preParsing option should handle throwing objects" time="0.000582" classname="test"/>
+	<testcase name="preParsing option should handle throwing objects by default" time="0.000480" classname="test"/>
+	<testcase name="preParsing option should handle errors with custom status code" time="0.000442" classname="test"/>
+	<testcase name="preParsing option should keep the context" time="0.002091" classname="test"/>
+	<testcase name="preParsing option should keep the context (array)" time="0.000646" classname="test"/>
+	<testcase name="preValidation option should be called before preHandler hook" time="0.000728" classname="test"/>
+	<testcase name="preSerialization option should be able to modify the payload" time="0.000731" classname="test"/>
+	<testcase name="preParsing option should be called before preValidation hook" time="0.000652" classname="test"/>
+	<testcase name="preParsing option should be able to modify the payload" time="0.000794" classname="test"/>
+	<testcase name="preParsing option should be able to supply statusCode" time="0.000993" classname="test"/>
+	<testcase name="onRequest option should be called before preParsing" time="0.000717" classname="test"/>
+	<testcase name="onTimeout on route" time="0.528382" classname="test"/>
+	<testcase name="onError on route" time="0.001758" classname="test"/>
+	<!-- tests 66 -->
+	<!-- suites 0 -->
+	<!-- pass 66 -->
+	<!-- fail 0 -->
+	<!-- cancelled 0 -->
+	<!-- skipped 0 -->
+	<!-- todo 0 -->
+	<!-- duration_ms 726.489166 -->
+</testsuites>

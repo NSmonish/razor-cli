@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="utf-8"?>
+<testsuites>
+	<testcase name="Should expose addSchema function" time="0.014517" classname="test"/>
+	<testcase name="Should expose getSchema function" time="0.000413" classname="test"/>
+	<testcase name="Should expose getSchemas function" time="0.000216" classname="test"/>
+	<testcase name="Should expose setValidatorCompiler function" time="0.000188" classname="test"/>
+	<testcase name="Should expose setSerializerCompiler function" time="0.000324" classname="test"/>
+	<testcase name="cannot call setValidatorCompiler after binding" time="0.014749" classname="test"/>
+	<testcase name="cannot call setSerializerCompiler after binding" time="0.003523" classname="test"/>
+	<testcase name="The schemas should be added to an internal storage" time="0.000843" classname="test"/>
+	<testcase name="The schemas should be accessible via getSchemas" time="0.001041" classname="test"/>
+	<testcase name="The schema should be accessible by id via getSchema" time="0.001652" classname="test"/>
+	<testcase name="Get validatorCompiler after setValidatorCompiler" time="0.001397" classname="test"/>
+	<testcase name="Get serializerCompiler after setSerializerCompiler" time="0.000708" classname="test"/>
+	<testcase name="Get compilers is empty when settle on routes" time="0.010567" classname="test"/>
+	<testcase name="Should throw if the $id property is missing" time="0.000292" classname="test"/>
+	<testcase name="Cannot add multiple times the same id" time="0.000293" classname="test"/>
+	<testcase name="Cannot add schema for query and querystring" time="0.001982" classname="test"/>
+	<testcase name="Should throw of the schema does not exists in input" time="0.022619" classname="test"/>
+	<testcase name="Should throw if schema is missing for content type" time="0.001288" classname="test"/>
+	<testcase name="Should throw of the schema does not exists in output" time="0.004545" classname="test"/>
+	<testcase name="Should not change the input schemas" time="0.016527" classname="test"/>
+	<testcase name="Should emit warning if the schema headers is undefined" time="0.001663" classname="test"/>
+	<testcase name="Should emit warning if the schema body is undefined" time="0.001045" classname="test"/>
+	<testcase name="Should emit warning if the schema query is undefined" time="0.001216" classname="test"/>
+	<testcase name="Should emit warning if the schema params is undefined" time="0.001071" classname="test"/>
+	<testcase name="Should emit a warning for every route with undefined schema" time="0.001779" classname="test"/>
+	<testcase name="Default validator compiler is initialized for a route whose only schema is false" time="0.003365" classname="test"/>
+	<testcase name="Boolean false request schemas reject every request and no handler executes" time="0.002188" classname="test"/>
+	<testcase name="Custom validator compiler receives the literal boolean false schema" time="0.000711" classname="test"/>
+	<testcase name="FSTWRN001 is emitted only for explicitly undefined schemas, not boolean false" time="0.002054" classname="test"/>
+	<testcase name="Invalid null schema fails closed during schema compilation" time="0.001188" classname="test"/>
+	<testcase name="Boolean false request schema via the query alias rejects every request" time="0.001231" classname="test"/>
+	<testcase name="Setting both query and querystring still throws (boolean false included)" time="0.000686" classname="test"/>
+	<testcase name="First level $ref" time="0.011201" classname="test"/>
+	<testcase name="Customize validator compiler in instance and route" time="0.002608" classname="test"/>
+	<testcase name="Use the same schema across multiple routes" time="0.009815" classname="test"/>
+	<testcase name="Encapsulation should intervene" time="0.006454" classname="test"/>
+	<testcase name="Encapsulation isolation" time="0.000963" classname="test"/>
+	<testcase name="Add schema after register" time="0.005842" classname="test"/>
+	<testcase name="Encapsulation isolation for getSchemas" time="0.001194" classname="test"/>
+	<testcase name="Use the same schema id in different places" time="0.006435" classname="test"/>
+	<testcase name="Get schema anyway should not add `properties` if allOf is present" time="0.008332" classname="test"/>
+	<testcase name="Get schema anyway should not add `properties` if oneOf is present" time="0.006563" classname="test"/>
+	<testcase name="Get schema anyway should not add `properties` if anyOf is present" time="0.005760" classname="test"/>
+	<testcase name="Shared schema should be ignored in string enum" time="0.005729" classname="test"/>
+	<testcase name="Shared schema should NOT be ignored in != string enum" time="0.006566" classname="test"/>
+	<testcase name="Case insensitive header validation" time="0.005624" classname="test"/>
+	<testcase name="Not evaluate json-schema $schema keyword" time="0.004990" classname="test"/>
+	<testcase name="Validation context in validation result" time="0.007333" classname="test"/>
+	<testcase name="The schema build should not modify the input" time="0.005614" classname="test"/>
+	<testcase name="Cross schema reference with encapsulation references" time="0.011802" classname="test"/>
+	<testcase name="Check how many AJV instances are built #1" time="0.008665" classname="test"/>
+	<testcase name="onReady hook has the compilers ready" time="0.004830" classname="test"/>
+	<testcase name="Check how many AJV instances are built #2 - verify validatorPool" time="0.007221" classname="test"/>
+	<testcase name="Add schema order should not break the startup" time="0.005190" classname="test"/>
+	<testcase name="The schema compiler recreate itself if needed" time="0.005604" classname="test"/>
+	<testcase name="Schema controller setter" time="0.000267" classname="test"/>
+	<testcase name="Schema controller bucket" time="0.001069" classname="test"/>
+	<testcase name="setSchemaController per instance" time="0.001242" classname="test"/>
+	<testcase name="setSchemaController: Inherits correctly parent schemas with a customized validator instance" time="0.006790" classname="test"/>
+	<testcase name="setSchemaController: Inherits buildSerializer from parent if not present within the instance" time="0.004504" classname="test"/>
+	<testcase name="setSchemaController: Inherits buildValidator from parent if not present within the instance" time="0.004499" classname="test"/>
+	<testcase name="Should throw if not default validator passed" time="0.006431" classname="test"/>
+	<testcase name="Should coerce the array if the default validator is used" time="0.004966" classname="test"/>
+	<testcase name="Should return a human-friendly error if response status codes are not specified" time="0.000737" classname="test"/>
+	<testcase name="setSchemaController: custom validator instance should not mutate headers schema" time="0.000660" classname="test"/>
+	<!-- tests 65 -->
+	<!-- suites 0 -->
+	<!-- pass 65 -->
+	<!-- fail 0 -->
+	<!-- cancelled 0 -->
+	<!-- skipped 0 -->
+	<!-- todo 0 -->
+	<!-- duration_ms 412.881833 -->
+</testsuites>

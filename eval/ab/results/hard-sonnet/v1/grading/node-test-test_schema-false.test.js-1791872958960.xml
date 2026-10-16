@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<testsuites>
+	<testcase name="false body schema rejects every request" time="0.044320" classname="test"/>
+	<testcase name="custom validatorCompiler receives false body schema" time="0.001584" classname="test"/>
+	<testcase name="null body schema fails ready" time="0.001806" classname="test"/>
+	<testcase name="false querystring schema rejects every request" time="0.002218" classname="test"/>
+	<testcase name="custom validatorCompiler receives false querystring schema" time="0.000986" classname="test"/>
+	<testcase name="null querystring schema fails ready" time="0.001262" classname="test"/>
+	<testcase name="false query schema rejects every request" time="0.002473" classname="test"/>
+	<testcase name="custom validatorCompiler receives false query schema" time="0.000884" classname="test"/>
+	<testcase name="null query schema fails ready" time="0.002219" classname="test"/>
+	<testcase name="false params schema rejects every request" time="0.001723" classname="test"/>
+	<testcase name="custom validatorCompiler receives false params schema" time="0.000699" classname="test"/>
+	<testcase name="null params schema fails ready" time="0.001497" classname="test"/>
+	<testcase name="false headers schema rejects every request" time="0.001850" classname="test"/>
+	<testcase name="custom validatorCompiler receives false headers schema" time="0.000780" classname="test"/>
+	<testcase name="null headers schema fails ready" time="0.000906" classname="test"/>
+	<testcase name="undefined schema still warns, false does not" time="0.003744" classname="test"/>
+	<testcase name="query and querystring together still throw" time="0.001135" classname="test"/>
+	<!-- tests 17 -->
+	<!-- suites 0 -->
+	<!-- pass 17 -->
+	<!-- fail 0 -->
+	<!-- cancelled 0 -->
+	<!-- skipped 0 -->
+	<!-- todo 0 -->
+	<!-- duration_ms 149.582209 -->
+</testsuites>

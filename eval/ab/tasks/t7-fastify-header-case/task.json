@@ -1,0 +1,83 @@
+{
+  "id": "t7-fastify-header-case",
+  "repo": "fastify",
+  "commit": "af6e2e433cfa2b4531e6297738da2acd66207742",
+  "source_fix": "fastify/fastify@3aa8dfd7 (2026-09-03): fix(validation): normalize header names in every schema subschema",
+  "tags": [
+    "real-fix",
+    "security",
+    "large-repo",
+    "hard"
+  ],
+  "prompt": "prompt.md",
+  "solution": "solution.patch",
+  "supp_files": {
+    "test/schema-validation.test.js": "supp/schema-validation.test.js"
+  },
+  "acceptance": [
+    {
+      "id": "AC1",
+      "desc": "canonical-case dependencies are enforced",
+      "source": "orig",
+      "file": "test/schema-validation.test.js",
+      "title": "header schema dependencies with canonical-case names are enforced",
+      "null_expect": "fail"
+    },
+    {
+      "id": "AC2",
+      "desc": "canonical-case schema behaves like the lowercase one (guard: already true before the fix)",
+      "source": "orig",
+      "file": "test/schema-validation.test.js",
+      "title": "header schema dependencies: lowercase-equivalent schema behaves identically",
+      "null_expect": "pass"
+    },
+    {
+      "id": "AC3",
+      "desc": "dependencies normalized in nested subschemas",
+      "source": "orig",
+      "file": "test/schema-validation.test.js",
+      "title": "header schema dependencies are normalized in nested subschemas",
+      "null_expect": "fail"
+    },
+    {
+      "id": "AC4",
+      "desc": "dependencies normalized in local $ref definitions",
+      "source": "orig",
+      "file": "test/schema-validation.test.js",
+      "title": "header schema dependencies are normalized in local $ref definitions",
+      "null_expect": "fail"
+    },
+    {
+      "id": "AC5",
+      "desc": "subschema-form dependency values normalized",
+      "source": "orig",
+      "file": "test/schema-validation.test.js",
+      "title": "header schema dependencies: subschema-form dependency values are normalized",
+      "null_expect": "fail"
+    },
+    {
+      "id": "AC6",
+      "desc": "input schema not mutated (guard: already true before the fix)",
+      "source": "orig",
+      "file": "test/schema-validation.test.js",
+      "title": "header schema lowercasing does not mutate the input schema",
+      "null_expect": "pass"
+    },
+    {
+      "id": "AC7",
+      "desc": "external $ref emits FSTSEC002(method, url, ref id)",
+      "source": "orig",
+      "file": "test/schema-validation.test.js",
+      "title": "header schema with an external $ref emits FSTSEC002 (case-normalization does not reach it)",
+      "null_expect": "fail"
+    },
+    {
+      "id": "AC8",
+      "desc": "inline and local $ref do not emit FSTSEC002",
+      "source": "orig",
+      "file": "test/schema-validation.test.js",
+      "title": "inline and local $ref header schemas do not emit FSTSEC002",
+      "null_expect": "fail"
+    }
+  ]
+}

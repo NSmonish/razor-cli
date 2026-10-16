@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<testsuites>
+	<testcase name="Should rewrite url" time="0.061306" classname="test"/>
+	<testcase name="Should not rewrite if the url is the same" time="0.006171" classname="test"/>
+	<testcase name="Should throw an error" time="0.006522" classname="test"/>
+	<testcase name="Should rewrite url but keep originalUrl unchanged" time="0.006690" classname="test"/>
+	<!-- tests 4 -->
+	<!-- suites 0 -->
+	<!-- pass 4 -->
+	<!-- fail 0 -->
+	<!-- cancelled 0 -->
+	<!-- skipped 0 -->
+	<!-- todo 0 -->
+	<!-- duration_ms 201.362 -->
+</testsuites>

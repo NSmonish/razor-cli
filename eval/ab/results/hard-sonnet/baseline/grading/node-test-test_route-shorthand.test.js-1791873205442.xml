@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<testsuites>
+	<testsuite name="route-shorthand" time="0.070820" disabled="0" errors="0" tests="10" failures="0" skipped="0" hostname="Sungjoons-MacBook-Pro-7.local">
+		<testcase name="route-shorthand - get" time="0.023741" classname="test"/>
+		<testcase name="route-shorthand - head" time="0.006220" classname="test"/>
+		<testcase name="route-shorthand - trace" time="0.003967" classname="test"/>
+		<testcase name="route-shorthand - delete" time="0.003455" classname="test"/>
+		<testcase name="route-shorthand - options" time="0.003624" classname="test"/>
+		<testcase name="route-shorthand - patch" time="0.003303" classname="test"/>
+		<testcase name="route-shorthand - put" time="0.002707" classname="test"/>
+		<testcase name="route-shorthand - post" time="0.003375" classname="test"/>
+		<testcase name="route-shorthand - query" time="0.006048" classname="test"/>
+		<testcase name="route-shorthand - all" time="0.013575" classname="test"/>
+	</testsuite>
+	<!-- tests 10 -->
+	<!-- suites 1 -->
+	<!-- pass 10 -->
+	<!-- fail 0 -->
+	<!-- cancelled 0 -->
+	<!-- skipped 0 -->
+	<!-- todo 0 -->
+	<!-- duration_ms 213.714667 -->
+</testsuites>

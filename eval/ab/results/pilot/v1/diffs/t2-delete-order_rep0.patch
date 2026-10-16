@@ -1,0 +1,137 @@
+diff --git a/example-application/entry-points/api.ts b/example-application/entry-points/api.ts
+index 4ecc904..b024321 100644
+--- a/example-application/entry-points/api.ts
++++ b/example-application/entry-points/api.ts
+@@ -77,6 +77,17 @@ const defineRoutes = (expressApp: express.Application) => {
+     res.json(response);
+   });
+ 
++  // delete order by id
++  router.delete('/:id', async (req, res, next) => {
++    try {
++      console.log(`Order API was called to delete order ${req.params.id}`);
++      await orderService.deleteOrder(req.params.id);
++      res.status(204).end();
++    } catch (error) {
++      next(error);
++    }
++  });
++
+   expressApp.use('/order', router);
+ 
+   expressApp.use(
+diff --git a/example-application/openapi.json b/example-application/openapi.json
+index 4dd4a36..2f3eea8 100644
+--- a/example-application/openapi.json
++++ b/example-application/openapi.json
+@@ -51,6 +51,28 @@
+             "content": {}
+           }
+         }
++      },
++      "delete": {
++        "summary": "Delete an Order by ID",
++        "description": "Deletes a single order",
++        "operationId": "deleteOrderById",
++        "parameters": [
++          {
++            "name": "orderId",
++            "in": "path",
++            "description": "ID of order to delete",
++            "required": true,
++            "schema": {
++              "type": "integer"
++            }
++          }
++        ],
++        "responses": {
++          "204": {
++            "description": "Order deleted",
++            "content": {}
++          }
++        }
+       }
+     },
+     "/order": {
+diff --git a/example-application/test/deleteOrder.test.ts b/example-application/test/deleteOrder.test.ts
+new file mode 100644
+index 0000000..7a383dc
+--- /dev/null
++++ b/example-application/test/deleteOrder.test.ts
+@@ -0,0 +1,76 @@
++import { buildOrder } from './order-data-factory';
++import { testSetup } from './setup/test-file-setup';
++
++beforeAll(async () => {
++  await testSetup.start({
++    startAPI: true,
++    disableNetConnect: true,
++    includeTokenInHttpClient: true,
++    mockGetUserCalls: true,
++    mockMailerCalls: true,
++  });
++});
++
++beforeEach(() => {
++  testSetup.resetBeforeEach();
++});
++
++afterAll(async () => {
++  testSetup.tearDownTestFile();
++});
++
++describe('DELETE /order/:id', () => {
++  test('When deleting an existing order, Then should respond with 204 and an empty body', async () => {
++    //Arrange
++    const {
++      data: { id: orderToDeleteId },
++    } = await testSetup.getHTTPClient().post('/order', buildOrder());
++
++    //Act
++    const deleteResponse = await testSetup
++      .getHTTPClient()
++      .delete(`/order/${orderToDeleteId}`);
++
++    //Assert
++    expect(deleteResponse.status).toBe(204);
++    expect(deleteResponse.data).toBeFalsy();
++  });
++
++  test('When deleting an existing order, Then it should no longer be retrievable', async () => {
++    //Arrange
++    const {
++      data: { id: orderToDeleteId },
++    } = await testSetup.getHTTPClient().post('/order', buildOrder());
++
++    //Act
++    await testSetup.getHTTPClient().delete(`/order/${orderToDeleteId}`);
++
++    //Assert
++    const getOrderResponse = await testSetup
++      .getHTTPClient()
++      .get(`/order/${orderToDeleteId}`);
++    expect(getOrderResponse.status).toBe(404);
++  });
++
++  test('When deleting an order, Then other orders should remain', async () => {
++    //Arrange
++    const {
++      data: { id: orderToDeleteId },
++    } = await testSetup.getHTTPClient().post('/order', buildOrder());
++    const {
++      data: { id: orderToKeepId },
++    } = await testSetup.getHTTPClient().post('/order', buildOrder());
++
++    //Act
++    await testSetup.getHTTPClient().delete(`/order/${orderToDeleteId}`);
++
++    //Assert
++    const getOrderResponse = await testSetup
++      .getHTTPClient()
++      .get(`/order/${orderToKeepId}`);
++    expect(getOrderResponse).toMatchObject({
++      status: 200,
++      data: { id: orderToKeepId },
++    });
++  });
++});

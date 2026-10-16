@@ -1,0 +1,51 @@
+diff --git a/lib/reply.js b/lib/reply.js
+index 9a15d4b..5923bc7 100644
+--- a/lib/reply.js
++++ b/lib/reply.js
+@@ -256,7 +256,13 @@ Reply.prototype.hasHeader = function (key) {
+ Reply.prototype.removeHeader = function (key) {
+   // Node.js does not like headers with keys set to undefined,
+   // so we have to delete the key.
+-  delete this[kReplyHeaders][key.toLowerCase()]
++  key = key.toLowerCase()
++  delete this[kReplyHeaders][key]
++  // Headers set directly on the raw response are visible through
++  // getHeader/hasHeader, so they must be removed as well.
++  if (!this.raw.headersSent) {
++    this.raw.removeHeader(key)
++  }
+   return this
+ }
+ 
+diff --git a/test/reply-raw-header.test.js b/test/reply-raw-header.test.js
+new file mode 100644
+index 0000000..a017300
+--- /dev/null
++++ b/test/reply-raw-header.test.js
+@@ -0,0 +1,26 @@
++'use strict'
++
++const { test } = require('node:test')
++const Fastify = require('..')
++
++test('reply.removeHeader removes headers set on the raw response', async t => {
++  const fastify = Fastify()
++  fastify.get('/', (req, reply) => {
++    reply.raw.setHeader('X-Powered-By', 'legacy')
++    reply.raw.setHeader('X-Other', 'keep')
++    reply.header('x-fastify', 'yes')
++    t.assert.strictEqual(reply.getHeader('x-powered-by'), 'legacy')
++    reply.removeHeader('X-POWERED-BY')
++    reply.removeHeader('X-Fastify')
++    t.assert.strictEqual(reply.hasHeader('x-powered-by'), false)
++    t.assert.strictEqual(reply.getHeader('x-powered-by'), undefined)
++    t.assert.strictEqual(reply.getHeaders()['x-powered-by'], undefined)
++    t.assert.strictEqual(reply.hasHeader('x-fastify'), false)
++    reply.send('ok')
++  })
++
++  const res = await fastify.inject('/')
++  t.assert.strictEqual(res.headers['x-powered-by'], undefined)
++  t.assert.strictEqual(res.headers['x-fastify'], undefined)
++  t.assert.strictEqual(res.headers['x-other'], 'keep')
++})

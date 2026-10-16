@@ -1,0 +1,75 @@
+{
+  "id": "t6-fastify-false-schemas",
+  "repo": "fastify",
+  "commit": "3aa8dfd7298c6e02399a7b3c29c637eb092dc9ef",
+  "source_fix": "fastify/fastify@0c170ca1 (2026-09-03): fix(validation): compile boolean false request schemas",
+  "tags": [
+    "real-fix",
+    "security",
+    "large-repo",
+    "hard"
+  ],
+  "prompt": "prompt.md",
+  "solution": "solution.patch",
+  "supp_files": {
+    "test/schema-feature.test.js": "supp/schema-feature.test.js"
+  },
+  "acceptance": [
+    {
+      "id": "AC1",
+      "desc": "false schema is enforced when it's the route's only schema (validator compiler initialized)",
+      "source": "orig",
+      "file": "test/schema-feature.test.js",
+      "title": "Default validator compiler is initialized for a route whose only schema is false",
+      "null_expect": "fail"
+    },
+    {
+      "id": "AC2",
+      "desc": "false body/querystring/params/headers schemas reject with 400; no handler runs",
+      "source": "orig",
+      "file": "test/schema-feature.test.js",
+      "title": "Boolean false request schemas reject every request and no handler executes",
+      "null_expect": "fail"
+    },
+    {
+      "id": "AC3",
+      "desc": "custom validatorCompiler receives literal false with httpPart",
+      "source": "orig",
+      "file": "test/schema-feature.test.js",
+      "title": "Custom validator compiler receives the literal boolean false schema",
+      "null_expect": "fail"
+    },
+    {
+      "id": "AC4",
+      "desc": "FSTWRN001 only for explicitly undefined schemas, not false",
+      "source": "orig",
+      "file": "test/schema-feature.test.js",
+      "title": "FSTWRN001 is emitted only for explicitly undefined schemas, not boolean false",
+      "null_expect": "fail"
+    },
+    {
+      "id": "AC5",
+      "desc": "null schema fails ready() with FST_ERR_SCH_VALIDATION_BUILD",
+      "source": "orig",
+      "file": "test/schema-feature.test.js",
+      "title": "Invalid null schema fails closed during schema compilation",
+      "null_expect": "fail"
+    },
+    {
+      "id": "AC6",
+      "desc": "false schema via the query alias rejects every request",
+      "source": "orig",
+      "file": "test/schema-feature.test.js",
+      "title": "Boolean false request schema via the query alias rejects every request",
+      "null_expect": "fail"
+    },
+    {
+      "id": "AC7",
+      "desc": "query + querystring together still throws",
+      "source": "orig",
+      "file": "test/schema-feature.test.js",
+      "title": "Setting both query and querystring still throws (boolean false included)",
+      "null_expect": "fail"
+    }
+  ]
+}

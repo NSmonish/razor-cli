@@ -1,0 +1,147 @@
+diff --git a/lib/route.js b/lib/route.js
+index 7fe37fc..82d06f5 100644
+--- a/lib/route.js
++++ b/lib/route.js
+@@ -410,10 +410,11 @@ function buildRouting (options) {
+             context.schema = normalizeSchema(context.schema, this.initialConfig)
+ 
+             const schemaController = this[kSchemaController]
+-            const hasValidationSchema = opts.schema.body ||
+-              opts.schema.headers ||
+-              opts.schema.querystring ||
+-              opts.schema.params
++            const hasValidationSchema = opts.schema.body !== undefined ||
++              opts.schema.headers !== undefined ||
++              opts.schema.querystring !== undefined ||
++              opts.schema.query !== undefined ||
++              opts.schema.params !== undefined
+             if (!opts.validatorCompiler && hasValidationSchema) {
+               schemaController.setupValidator(this[kOptions])
+             }
+diff --git a/lib/schemas.js b/lib/schemas.js
+index 74b1d05..c177a67 100644
+--- a/lib/schemas.js
++++ b/lib/schemas.js
+@@ -61,9 +61,9 @@ function normalizeSchema (routeSchemas, serverOptions) {
+   }
+ 
+   // alias query to querystring schema
+-  if (routeSchemas.query) {
++  if (routeSchemas.query !== undefined) {
+     // check if our schema has both querystring and query
+-    if (routeSchemas.querystring) {
++    if (routeSchemas.querystring !== undefined) {
+       throw new FST_ERR_SCH_DUPLICATE('querystring')
+     }
+     routeSchemas.querystring = routeSchemas.query
+diff --git a/lib/validation.js b/lib/validation.js
+index d66b129..128be09 100644
+--- a/lib/validation.js
++++ b/lib/validation.js
+@@ -227,10 +227,11 @@ function compileSchemasForValidation (context, compile, isCustom) {
+ 
+   const headers = schema.headers
+   // the or part is used for backward compatibility
+-  if (headers && (isCustom || Object.getPrototypeOf(headers) !== Object.prototype)) {
++  if (headers !== undefined && (isCustom || headers === null || typeof headers !== 'object' ||
++    Object.getPrototypeOf(headers) !== Object.prototype)) {
+     // do not mess with schema when custom validator applied, e.g. Joi, Typebox
+     context[headersSchema] = compile({ schema: headers, method, url, httpPart: 'headers' })
+-  } else if (headers) {
++  } else if (headers !== undefined) {
+     // The header keys are case insensitive
+     //  https://datatracker.ietf.org/doc/html/rfc2616#section-4.2
+     const headersSchemaLowerCase = lowerCaseHeadersSchema(headers)
+@@ -243,8 +244,8 @@ function compileSchemasForValidation (context, compile, isCustom) {
+     FSTWRN001('headers', method, url)
+   }
+ 
+-  if (schema.body) {
+-    const contentProperty = schema.body.content
++  if (schema.body !== undefined) {
++    const contentProperty = schema.body !== null && typeof schema.body === 'object' ? schema.body.content : undefined
+     if (contentProperty) {
+       const contentTypeSchemas = {}
+       for (const contentType of Object.keys(contentProperty)) {
+@@ -259,13 +260,13 @@ function compileSchemasForValidation (context, compile, isCustom) {
+     FSTWRN001('body', method, url)
+   }
+ 
+-  if (schema.querystring) {
++  if (schema.querystring !== undefined) {
+     context[querystringSchema] = compile({ schema: schema.querystring, method, url, httpPart: 'querystring' })
+   } else if (Object.hasOwn(schema, 'querystring')) {
+     FSTWRN001('querystring', method, url)
+   }
+ 
+-  if (schema.params) {
++  if (schema.params !== undefined) {
+     context[paramsSchema] = compile({ schema: schema.params, method, url, httpPart: 'params' })
+   } else if (Object.hasOwn(schema, 'params')) {
+     FSTWRN001('params', method, url)
+diff --git a/test/false-schema.test.js b/test/false-schema.test.js
+new file mode 100644
+index 0000000..021fa46
+--- /dev/null
++++ b/test/false-schema.test.js
+@@ -0,0 +1,60 @@
++'use strict'
++
++const { test } = require('node:test')
++const Fastify = require('..')
++
++for (const [part, opts] of [
++  ['body', { method: 'POST', url: '/x', payload: { a: 1 } }],
++  ['querystring', { method: 'GET', url: '/x?a=1' }],
++  ['query', { method: 'GET', url: '/x?a=1' }],
++  ['params', { method: 'GET', url: '/x' }],
++  ['headers', { method: 'GET', url: '/x' }]
++]) {
++  test(`false ${part} schema rejects every request`, async (t) => {
++    const fastify = Fastify()
++    let called = false
++    fastify.route({
++      method: opts.method,
++      url: part === 'params' ? '/:id' : '/x',
++      schema: { [part]: false },
++      handler: async () => { called = true; return 'ok' }
++    })
++    const res = await fastify.inject(opts)
++    t.assert.strictEqual(res.statusCode, 400)
++    t.assert.strictEqual(called, false)
++  })
++
++  test(`custom validatorCompiler receives false ${part} schema`, async (t) => {
++    const fastify = Fastify()
++    const seen = []
++    fastify.setValidatorCompiler(({ schema, httpPart }) => {
++      seen.push([schema, httpPart])
++      return () => true
++    })
++    fastify.route({
++      method: opts.method,
++      url: part === 'params' ? '/:id' : '/x',
++      schema: { [part]: false },
++      handler: async () => 'ok'
++    })
++    await fastify.ready()
++    t.assert.ok(seen.length >= 1)
++    for (const entry of seen) {
++      t.assert.deepStrictEqual(entry, [false, part === 'query' ? 'querystring' : part])
++    }
++  })
++}
++
++test('null schema fails ready', async (t) => {
++  for (const part of ['body', 'querystring', 'query', 'params', 'headers']) {
++    const fastify = Fastify()
++    fastify.post('/:id', { schema: { [part]: null } }, async () => 'ok')
++    await t.assert.rejects(fastify.ready(), { code: 'FST_ERR_SCH_VALIDATION_BUILD' })
++  }
++})
++
++test('query and querystring together still throw, even when false', async (t) => {
++  const fastify = Fastify()
++  fastify.get('/', { schema: { query: false, querystring: { type: 'object' } } }, async () => 'ok')
++  await t.assert.rejects(fastify.ready(), { code: 'FST_ERR_SCH_DUPLICATE' })
++})

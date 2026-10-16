@@ -1,0 +1,10 @@
+--- a/lib/reply.js
++++ b/lib/reply.js
+@@ -257,6 +257,7 @@
+   // Node.js does not like headers with keys set to undefined,
+   // so we have to delete the key.
+   delete this[kReplyHeaders][key.toLowerCase()]
++  this.raw.removeHeader(key)
+   return this
+ }
+ 
