@@ -1,8 +1,10 @@
 // Razor skill registry — minimal cloud hub so a team can publish generated
-// skills and pull them into any workspace. REST + a tiny HTML landing page.
+// skills and pull them into any workspace. REST + multi-page site.
 //
 // endpoints:
-//   GET  /                      landing page (human-friendly)
+//   GET  /                      home (product story)
+//   GET  /guide                 how to launch Razor on your repo
+//   GET  /skills                published skills (live, with pull commands)
 //   GET  /health                liveness probe (for the host)
 //   GET  /api/skills            list/search (?namespace=&q=)
 //   GET  /api/skills/:ns/:name  pull one skill (full, with files)
@@ -15,114 +17,128 @@ const express = require('express');
 const path = require('path');
 const { createStore } = require('./store');
 
+const LOGO = (s) => `<svg width="${s}" height="${s}" viewBox="0 0 48 48" aria-hidden="true"><rect width="48" height="48" rx="11" fill="#1f3864"/><text x="24" y="33" font-family="Arial,Helvetica,sans-serif" font-size="27" font-weight="bold" fill="#ffffff" text-anchor="middle">R</text><path d="M9 40L39 8" stroke="#7fd4ff" stroke-width="3" stroke-linecap="round"/></svg>`;
+
+const CSS = `
+*{box-sizing:border-box}
+body{margin:0;font:16px/1.65 -apple-system,Segoe UI,Roboto,Arial,sans-serif;background:#0a0f1e;color:#e9eef7}
+a{color:#7fd4ff}
+code{background:#1a2340;padding:2px 7px;border-radius:5px;font-size:.92em}
+pre{background:#0d1326;border:1px solid #22304d;color:#dbe7ff;padding:16px 18px;border-radius:10px;overflow-x:auto;font-size:14px;line-height:1.55}
+pre .p{color:#3ddc84}
+.nav{position:sticky;top:0;z-index:10;background:rgba(10,15,30,.88);backdrop-filter:blur(10px);border-bottom:1px solid #1c2742}
+.nav-inner{max-width:1080px;margin:0 auto;padding:13px 20px;display:flex;align-items:center;justify-content:space-between}
+.brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:19px;color:#fff;text-decoration:none}
+.nav nav a{margin-left:22px;text-decoration:none;color:#9aa7bd;font-size:15px}
+.nav nav a.active,.nav nav a:hover{color:#fff}
+.nav nav a.gh{border:1px solid #5b9dff;border-radius:8px;padding:6px 15px;color:#fff}
+.wrap{max-width:1080px;margin:0 auto;padding:0 20px}
+.hero{text-align:center;padding:88px 20px 66px;position:relative;overflow:hidden}
+.hero::before{content:"";position:absolute;inset:-40px;background:radial-gradient(620px 320px at 50% 0%,rgba(91,157,255,.22),transparent 70%);pointer-events:none}
+.hero h1{font-size:48px;line-height:1.15;margin:28px 0 14px;background:linear-gradient(92deg,#ffffff 20%,#9cc4ff 80%);-webkit-background-clip:text;background-clip:text;color:transparent}
+.lede{font-size:18.5px;color:#aeb9cf;max-width:660px;margin:0 auto 30px}
+.btn{display:inline-block;text-decoration:none;border:1px solid #5b9dff;border-radius:10px;padding:11px 24px;margin:0 6px;font-weight:600;color:#fff}
+.btn.primary{background:linear-gradient(92deg,#3b7de9,#5b9dff);border:none;box-shadow:0 6px 24px rgba(91,157,255,.35)}
+.btn:hover{filter:brightness(1.12)}
+.stats{display:flex;gap:14px;margin:6px 0}
+.stats div{flex:1;background:#101832;border:1px solid #1c2742;border-radius:12px;padding:16px 18px}
+.stats b{display:block;font-size:24px;color:#7fd4ff}
+.stats span{font-size:13.5px;color:#9aa7bd}
+section.block{margin:56px 0}
+section.block h2{font-size:29px;margin-bottom:12px;color:#fff}
+.muted{color:#9aa7bd;font-size:14.5px}
+.grid3{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px}
+.card{background:#101832;border:1px solid #1c2742;border-radius:12px;padding:18px 20px}
+.card b{color:#7fd4ff}
+.card h3{margin:0 0 6px;font-size:17px}
+.stepnum{display:inline-block;background:linear-gradient(92deg,#3b7de9,#5b9dff);color:#fff;font-weight:700;border-radius:50%;width:30px;height:30px;line-height:30px;text-align:center;margin-bottom:8px;font-size:15px}
+.quotes{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px}
+blockquote{border:1px solid #1c2742;border-left:4px solid #5b9dff;background:#101832;border-radius:0 12px 12px 0;padding:16px 18px;margin:0;font-size:14.5px;color:#d5deef}
+blockquote cite{display:block;margin-top:12px;font-style:normal;font-size:13px;color:#9aa7bd}
+.skill{background:#101832;border:1px solid #1c2742;border-radius:10px;padding:14px 18px;margin:12px 0;transition:border-color .15s}
+.skill:hover{border-color:#5b9dff}
+.skill h4{margin:0 0 4px;font-size:17px}.skill h4 .ver{font-weight:normal;color:#9aa7bd;font-size:13px}
+.skill .desc{margin:4px 0;color:#c3cede}.skill .tags{margin:8px 0}
+.skill .tag{display:inline-block;background:#182448;color:#9cc4ff;border-radius:10px;padding:1px 10px;margin:0 5px 5px 0;font-size:13px}
+.skill .pullcmd{position:relative}.skill .pullcmd button{position:absolute;top:8px;right:8px;font-size:12px;padding:4px 12px;border:1px solid #5b9dff;border-radius:7px;background:#0d1428;color:#fff;cursor:pointer}
+#skills-empty{color:#9aa7bd}
+.cta-band{background:linear-gradient(92deg,#16265c,#1f3864);border:1px solid #2c4a8f;border-radius:16px;padding:36px;text-align:center;margin:64px 0}
+.cta-band h2{margin:0 0 8px;color:#fff}
+.cta-band p{color:#b9c6e2;margin:0 0 20px}
+footer{border-top:1px solid #1c2742;margin-top:70px;padding:34px 0 46px;color:#9aa7bd;font-size:14px}
+.foot-grid{max-width:1080px;margin:0 auto;padding:0 20px;display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:24px}
+.foot-grid h4{color:#fff;margin:0 0 10px;font-size:14px;text-transform:uppercase;letter-spacing:.06em}
+.foot-grid a{display:block;color:#9aa7bd;text-decoration:none;margin:6px 0}
+.foot-grid a:hover{color:#fff}
+.foot-bottom{max-width:1080px;margin:26px auto 0;padding:18px 20px 0;border-top:1px solid #1c2742;display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px}
+@media(max-width:640px){.hero h1{font-size:34px}.stats{flex-direction:column}}
+`;
+
+function layout({ title, active, origin, body }) {
+  const nav = (href, label, key) =>
+    `<a href="${href}" class="${active === key ? 'active' : ''}">${label}</a>`;
+  return `<!doctype html><html><head><meta charset="utf-8">
+<title>${title} — Razor</title><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="Razor scans your repository and generates right-sized, token-efficient agent context packs.">
+<style>${CSS}</style></head>
+<body>
+<header class="nav"><div class="nav-inner">
+<a class="brand" href="/">${LOGO(32)}<span>Razor</span></a>
+<nav>${nav('/', 'Home', 'home')}${nav('/guide', 'Guide', 'guide')}${nav('/skills', 'Skills', 'skills')}<a class="gh" href="https://github.com/NSmonish/razor-cli">GitHub</a></nav>
+</div></header>
+<div class="wrap">${body}</div>
+<footer><div class="foot-grid">
+<div><h4>Product</h4><a href="/#problem">The problem</a><a href="/guide">How it works</a><a href="/skills">Skill registry</a></div>
+<div><h4>Resources</h4><a href="https://github.com/NSmonish/razor-cli">GitHub repo</a><a href="/api/skills">Registry API</a><a href="/health">Health check</a></div>
+<div><h4>Team</h4><a href="/#feedback">User feedback</a><span style="display:block;color:#9aa7bd;margin:6px 0">COMS E6998 — Build an Agent Startup</span><span style="display:block;color:#9aa7bd;margin:6px 0">Columbia University, Fall 2026</span></div>
+</div><div class="foot-bottom"><span>Razor — give your coding agent a teammate.</span><span>Registry: ${origin}</span></div></footer>
+</body></html>`;
+}
+
 function createApp(store) {
   const app = express();
   app.use(express.json({ limit: '2mb' }));
 
   const nsOk = (s) => typeof s === 'string' && /^[a-z0-9][a-z0-9-]{0,38}$/.test(s);
   const nameOk = (s) => typeof s === 'string' && /^[a-z][a-z0-9-]{1,39}$/.test(s);
-
   app.get('/health', (req, res) => res.json({ ok: true, store: store.kind }));
 
-  app.get('/', (req, res) => {
-    const proto = req.get('x-forwarded-proto') || req.protocol;
-    const origin = `${proto}://${req.get('host')}`;
-    const logo = (s) => `<svg width="${s}" height="${s}" viewBox="0 0 48 48" aria-hidden="true"><rect width="48" height="48" rx="11" fill="#1f3864"/><text x="24" y="33" font-family="Arial,Helvetica,sans-serif" font-size="27" font-weight="bold" fill="#ffffff" text-anchor="middle">R</text><path d="M9 40L39 8" stroke="#7fd4ff" stroke-width="3" stroke-linecap="round"/></svg>`;
-    res.type('html').send(`<!doctype html><html><head><meta charset="utf-8">
-<title>Razor — Skill Registry</title><meta name="viewport" content="width=device-width,initial-scale=1">
-<style>
-body{font:16px/1.6 -apple-system,Segoe UI,Roboto,Arial,sans-serif;max-width:880px;margin:0 auto;padding:0 20px 60px;color:#1b1f24}
-a{color:#1f3864}
-code{background:#f2f4f8;padding:2px 6px;border-radius:4px}
-pre{background:#0f1b2d;color:#e6edf3;padding:14px 16px;border-radius:8px;overflow-x:auto;font-size:14px}
-.nav{display:flex;align-items:center;justify-content:space-between;padding:16px 0;border-bottom:1px solid #e6eaf0}
-.brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:20px;color:#1f3864}
-.nav nav a{margin-left:18px;text-decoration:none;font-size:15px}
-.nav nav a.gh{border:1px solid #1f3864;border-radius:8px;padding:5px 14px}
-.hero{text-align:center;padding:56px 0 40px}
-.hero h1{font-size:38px;margin:22px 0 10px;color:#1b1f24}
-.lede{font-size:18px;color:#3c4450;max-width:640px;margin:0 auto 26px}
-.btn{display:inline-block;text-decoration:none;border:1px solid #1f3864;border-radius:10px;padding:10px 22px;margin:0 6px;font-weight:600}
-.btn.primary{background:#1f3864;color:#fff}
-.stats{display:flex;gap:14px;margin:10px 0 8px}
-.stats div{flex:1;background:#f2f5fa;border-radius:10px;padding:14px 16px}
-.stats b{display:block;font-size:22px;color:#1f3864}
-.stats span{font-size:13.5px;color:#3c4450}
-section{margin:44px 0}
-section h2{font-size:26px;color:#1f3864;margin-bottom:10px}
-.muted{color:#5b6472;font-size:14.5px}
-.steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}
-.step{border:1px solid #d8dee6;border-radius:10px;padding:14px 16px}
-.step b{color:#1f3864}
-.skill{border:1px solid #d8dee6;border-radius:8px;padding:12px 16px;margin:12px 0}
-.skill h4{margin:0 0 4px;font-size:17px}.skill h4 .ver{font-weight:normal;color:#5b6472;font-size:13px}
-.skill .desc{margin:4px 0;color:#333}.skill .tags{margin:6px 0}
-.skill .tag{display:inline-block;background:#eef2f7;color:#1f3864;border-radius:10px;padding:1px 9px;margin:0 4px 4px 0;font-size:13px}
-.skill .pullcmd{position:relative}.skill .pullcmd button{position:absolute;top:8px;right:8px;font-size:12px;padding:3px 10px;border:1px solid #9fb3c8;border-radius:6px;background:#fff;cursor:pointer}
-#skills-empty{color:#5b6472}
-.quotes{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px}
-blockquote{border-left:4px solid #1f3864;background:#f7f9fc;border-radius:0 10px 10px 0;padding:14px 16px;margin:0;font-size:14.5px}
-blockquote cite{display:block;margin-top:10px;font-style:normal;font-size:13px;color:#5b6472}
-footer{border-top:1px solid #e6eaf0;margin-top:56px;padding-top:18px;color:#5b6472;font-size:14px;text-align:center}
-</style></head>
-<body>
-<header class="nav"><div class="brand">${logo(34)}<span>Razor</span></div>
-<nav><a href="#registry">Skills</a><a href="#how">How it works</a><a href="#example">Example</a><a href="#feedback">Feedback</a><a class="gh" href="https://github.com/NSmonish/razor-cli">GitHub</a></nav></header>
+  const getOrigin = (req) => `${req.get('x-forwarded-proto') || req.protocol}://${req.get('host')}`;
 
+  // ---- Home: product story ----
+  app.get('/', (req, res) => {
+    const origin = getOrigin(req);
+    const body = `
 <section class="hero">
-${logo(76)}
+${LOGO(84)}
 <h1>Your coding agent needs a teammate.</h1>
 <p class="lede">Razor scans your repository, learns its conventions, and generates right-sized, token-efficient agent context packs — AGENTS.md, layered docs, and shareable skills.</p>
-<div><a class="btn primary" href="#registry">Browse the skills</a><a class="btn" href="#start">Get started</a></div>
+<div><a class="btn primary" href="/guide">Launch Razor on your repo</a><a class="btn" href="/skills">Browse the skills</a></div>
 </section>
 
-<section class="stats">
+<section class="block"><div class="stats">
 <div><b>10</b><span>user interviews with engineers at Google, Meta, Salesforce, Ericsson and more</span></div>
 <div><b>&minus;2% / +23%</b><span>task-resolution drop / inference-cost spike from bloated LLM-generated context files (Gloaguen et al., 2026)</span></div>
 <div><b>&frac13;</b><span>of the right context retrieved by SOTA models on ContextBench — the rest is wasted tokens</span></div>
-</section>
+</div></section>
 
-<section id="problem">
+<section class="block" id="problem">
 <h2>The problem</h2>
 <p>Deploying a coding agent into a complex codebase is like sending someone into the Butler Library stacks without a guide. The agent burns 100k tokens grepping for a pattern, comes back empty-handed, hallucinates conventions, and ignores how your repo actually works.</p>
 <p>Hand-written or LLM-generated AGENTS.md files were supposed to fix this — but research shows generated repo-wide context files <i>lower</i> task success while raising cost. So developers hand-maintain instruction files that nobody keeps up to date.</p>
 </section>
 
-<section id="how">
-<h2>How Razor works</h2>
-<div class="steps">
-<div class="step"><b>1. Scan</b><p>Razor scans your repo — framework, ORM, test runner, scripts, structure — and captures evidence for every detection.</p><pre>node index.js scaffold ./my-repo -o ./pack</pre></div>
-<div class="step"><b>2. Publish</b><p>Share the generated skills with your team on this registry.</p><pre>node index.js publish ./pack --registry ${origin} --namespace team-alpha</pre></div>
-<div class="step"><b>3. Pull</b><p>Anyone pulls just the skill they need, straight into their workspace.</p><pre>node index.js pull team-alpha/run-tests --registry ${origin} -o .agent</pre></div>
+<section class="block">
+<h2>How it works</h2>
+<div class="grid3">
+<div class="card"><span class="stepnum">1</span><h3>Scan</h3><p class="muted">Razor scans your repo — framework, ORM, test runner, scripts, structure — and captures evidence for every detection.</p></div>
+<div class="card"><span class="stepnum">2</span><h3>Publish</h3><p class="muted">Share the generated skills with your team on the <a href="/skills">skill registry</a>.</p></div>
+<div class="card"><span class="stepnum">3</span><h3>Pull</h3><p class="muted">Anyone pulls just the skill they need, straight into their workspace. No regeneration.</p></div>
 </div>
+<p style="margin-top:16px"><a class="btn primary" href="/guide">Read the full guide</a></p>
 </section>
 
-<section id="registry">
-<h2>Published skills</h2>
-<p class="muted">Live from this registry — refreshes automatically.</p>
-<div id="skills"><p id="skills-empty">Loading…</p></div>
-<p class="muted">Raw JSON: <a href="/api/skills">/api/skills</a></p>
-</section>
-
-<section id="example">
-<h2>Example</h2>
-<p>Scanning the razor-cli repo itself:</p>
-<pre>$ node index.js scaffold ./razor-cli -o ./pack
-Razor is scanning the repository...
-Detected: Express.js / unknown / unknown
-Plan size: 6 (docs: 4, skills: 1)
-
-Context pack written to ./pack/ (8 files):
-  AGENTS.md
-  overview.md / architecture.md / workflows.md / steering.md
-  skills/code-push/SKILL.md
-  scripts/check.sh
-  skills.index.json</pre>
-<p>The generated <code>code-push</code> skill ("Verify then push changes to the remote") was published to this registry. Try pulling it:</p>
-<pre>node index.js pull smoke/code-push --registry ${origin} -o ./demo</pre>
-</section>
-
-<section id="feedback">
+<section class="block" id="feedback">
 <h2>What users say</h2>
 <div class="quotes">
 <blockquote>"It happens maybe 1/5 times where the agent gets something wrong and is taking too many prompts to fix. Usually it will cost me half a day's work to update things to my standards."<cite>— Melody, Software Engineer, Google</cite></blockquote>
@@ -132,22 +148,102 @@ Context pack written to ./pack/ (8 files):
 <p class="muted">From 10 user interviews conducted by the Razor team, Fall 2026.</p>
 </section>
 
-<section id="start">
-<h2>Get started</h2>
-<pre>git clone https://github.com/NSmonish/razor-cli &amp;&amp; cd razor-cli
-npm install
-node index.js scaffold ./your-repo -o ./pack</pre>
-<p>Then publish your pack's skills here and share the pull command with your team.</p>
+<section class="cta-band">
+<h2>Stop letting your agent wander the stacks.</h2>
+<p>Generate a context pack for your repo in under a minute.</p>
+<a class="btn primary" href="/guide">Get started</a>
+</section>`;
+    res.type('html').send(layout({ title: 'Skill Registry', active: 'home', origin, body }));
+  });
+
+  // ---- Guide: launch Razor on your repo ----
+  app.get('/guide', (req, res) => {
+    const origin = getOrigin(req);
+    const body = `
+<section class="block" style="margin-top:40px">
+<h2>Launch Razor on your repo</h2>
+<p class="muted">From zero to a published skill in about five minutes. You need Node 18+.</p>
 </section>
 
-<footer>Built by the Razor team &middot; COMS E6998 &mdash; Build an Agent Startup, Columbia University &middot; <a href="https://github.com/NSmonish/razor-cli">GitHub</a></footer>
+<section class="block">
+<h2>1. Install</h2>
+<pre><span class="p">$</span> git clone https://github.com/NSmonish/razor-cli && cd razor-cli
+<span class="p">$</span> npm install</pre>
+</section>
 
+<section class="block">
+<h2>2. Scan your repo</h2>
+<p>Razor detects your stack — framework, ORM, test runner, scripts, project structure — and records evidence for every detection. Then it generates the pack:</p>
+<pre><span class="p">$</span> node index.js scaffold ./my-repo -o ./pack
+Razor is scanning the repository...
+Detected: Express.js / Jest / Prisma
+Plan size: 9 (docs: 5, skills: 3)
+
+Context pack written to ./pack/ (11 files):
+  AGENTS.md
+  overview.md / architecture.md / workflows.md / steering.md
+  skills/run-tests/SKILL.md
+  skills/db-migrations/SKILL.md
+  skills/lint-fix/SKILL.md
+  scripts/check.sh
+  skills.index.json</pre>
+<p class="muted">The pack works with Cursor, Codex, Copilot, Gemini CLI, Claude Code and other agents via the open AGENTS.md standard.</p>
+</section>
+
+<section class="block">
+<h2>3. Publish your skills</h2>
+<p>Push the generated skills to this registry under your team's namespace so nobody has to regenerate them:</p>
+<pre><span class="p">$</span> node index.js publish ./pack --registry ${origin} --namespace team-alpha
+Publishing 3 skill(s) to ${origin} as @team-alpha ...
+  ✓ team-alpha/run-tests (v1)
+  ✓ team-alpha/db-migrations (v1)
+  ✓ team-alpha/lint-fix (v1)
+
+3/3 published.</pre>
+<p>They show up instantly on the <a href="/skills">Skills page</a>.</p>
+</section>
+
+<section class="block">
+<h2>4. Pull what you need</h2>
+<p>Anyone on the team — on any machine — pulls just the skill they need:</p>
+<pre><span class="p">$</span> node index.js pull team-alpha/run-tests --registry ${origin} -o .agent
+Pulled team-alpha/run-tests (v1) into .agent/
+  skills/run-tests/SKILL.md</pre>
+</section>
+
+<section class="block">
+<h2>Tips</h2>
+<div class="grid3">
+<div class="card"><h3>Republish freely</h3><p class="muted">Publishing the same skill again updates it in place — iterate on your packs without version headaches.</p></div>
+<div class="card"><h3>Namespace per team</h3><p class="muted">Namespaces are lowercase letters, numbers and dashes (max 39 chars). One per team or project keeps things tidy.</p></div>
+<div class="card"><h3>Browse the API</h3><p class="muted"><a href="/api/skills">/api/skills</a> lists everything as JSON — filter with <code>?namespace=</code> or <code>?q=</code>.</p></div>
+</div>
+</section>
+
+<section class="cta-band">
+<h2>Your repo is one scan away.</h2>
+<p>Generate the pack, publish the skills, share the pull command.</p>
+<a class="btn primary" href="/skills">See published skills</a>
+</section>`;
+    res.type('html').send(layout({ title: 'Guide', active: 'guide', origin, body }));
+  });
+
+  // ---- Skills: live team registry ----
+  app.get('/skills', (req, res) => {
+    const origin = getOrigin(req);
+    const body = `
+<section class="block" style="margin-top:40px">
+<h2>Team skills</h2>
+<p class="muted">Every skill published to this registry, live. Click <b>Copy</b> on any card to get its pull command.</p>
+<div id="skills"><p id="skills-empty">Loading…</p></div>
+<p class="muted">Raw JSON: <a href="/api/skills">/api/skills</a> · Publish yours: <a href="/guide">read the guide</a></p>
+</section>
 <script>
 var ORIGIN = ${JSON.stringify(origin)};
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
 function render(skills){
   var box=document.getElementById('skills');
-  if(!skills.length){box.innerHTML='<p id="skills-empty">No skills published yet — be the first.</p>';return;}
+  if(!skills.length){box.innerHTML='<p id="skills-empty">No skills published yet — <a href="/guide">publish the first one</a>.</p>';return;}
   box.innerHTML=skills.map(function(s){
     var full=esc(s.namespace)+'/'+esc(s.name);
     var cmd='node index.js pull '+s.namespace+'/'+s.name+' --registry '+ORIGIN+' -o .agent';
@@ -168,8 +264,8 @@ async function load(){
   catch(e){document.getElementById('skills').innerHTML='<p id="skills-empty">Could not load skills.</p>';}
 }
 load();setInterval(load,30000);
-</script>
-</body></html>`);
+</script>`;
+    res.type('html').send(layout({ title: 'Skills', active: 'skills', origin, body }));
   });
 
   app.get('/api/skills', async (req, res) => {
