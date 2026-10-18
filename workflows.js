@@ -28,6 +28,47 @@ function firstExisting(root, candidates) {
   return null;
 }
 
+// find the first directory named one of `names` anywhere in the tree (bounded
+// depth + ignoring heavy dirs). top-level checks miss migrations nested under
+// e.g. example-application/data-access/migrations, which is common.
+function findDirNamed(root, names, maxDepth = 4) {
+  const IGNORE = new Set(['node_modules', '.git', 'dist', 'build', 'out',
+    'coverage', 'venv', '.venv', '__pycache__', 'target', '.next', '.cache']);
+  const want = new Set(names);
+  const stack = [{ dir: root, depth: 0 }];
+  while (stack.length) {
+    const { dir, depth } = stack.pop();
+    let entries;
+    try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch (_) { continue; }
+    for (const e of entries) {
+      if (!e.isDirectory() || IGNORE.has(e.name) || e.name.startsWith('.')) continue;
+      if (want.has(e.name)) return path.relative(root, path.join(dir, e.name));
+      if (depth < maxDepth) stack.push({ dir: path.join(dir, e.name), depth: depth + 1 });
+    }
+  }
+  return null;
+}
+
+// find the first file whose basename matches `re` anywhere in the tree
+// (bounded depth, ignoring heavy dirs). returns the relative path or null.
+function findFileMatching(root, re, maxDepth = 4) {
+  const IGNORE = new Set(['node_modules', '.git', 'dist', 'build', 'out',
+    'coverage', 'venv', '.venv', '__pycache__', 'target', '.next', '.cache']);
+  const stack = [{ dir: root, depth: 0 }];
+  while (stack.length) {
+    const { dir, depth } = stack.pop();
+    let entries;
+    try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch (_) { continue; }
+    for (const e of entries) {
+      if (e.isFile() && re.test(e.name)) return path.relative(root, path.join(dir, e.name));
+      if (e.isDirectory() && !IGNORE.has(e.name) && !e.name.startsWith('.') && depth < maxDepth) {
+        stack.push({ dir: path.join(dir, e.name), depth: depth + 1 });
+      }
+    }
+  }
+  return null;
+}
+
 // look at a repo and report the workflow-relevant facts the planner keys off.
 // returns plain booleans + an evidence map, same spirit as scanner.js.
 function detectWorkflows(dir) {
@@ -63,13 +104,15 @@ function detectWorkflows(dir) {
   let hasDocker = false;
   const dockerFile = firstExisting(root, [
     'Dockerfile', 'docker-compose.yml', 'docker-compose.yaml', 'compose.yml',
-  ]);
+  ]) || findFileMatching(root, /^(Dockerfile|docker-compose.*\.ya?ml|compose\.ya?ml)$/i);
   if (dockerFile) { hasDocker = true; ev.docker = dockerFile; }
 
   // db migrations — a dir or a known migration tool config
   let hasMigrations = false;
+  // top-level fast path first, then a bounded recursive search for nested
+  // migration dirs (e.g. example-application/data-access/migrations).
   const migDir = ['migrations', 'prisma/migrations', 'alembic', 'db/migrate']
-    .find((d) => isDir(root, d));
+    .find((d) => isDir(root, d)) || findDirNamed(root, ['migrations', 'migrate']);
   if (migDir) {
     hasMigrations = true;
     ev.migrations = `${migDir}/`;

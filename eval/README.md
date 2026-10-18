@@ -6,7 +6,7 @@ production-grade repositories (small libraries → large multi-language codebase
 ## Files
 
 - `eval_cases.txt` — the 20 repos (name + git URL).
-- `run_eval.sh` — clones each repo and runs `scaffold --offline`, recording the
+- `run_eval.sh` — clones each repo and runs `scaffold` with `RAZOR_NO_LLM=1`, recording the
   detected stack, skills, check command, and file count. Regenerates `results.txt`.
 - `results.txt` — the recorded outputs for all 20 repos.
 
@@ -31,6 +31,6 @@ commands + no hallucination + right-sized). The one hard failure is #11
 pass/fail judgement, failure analysis, and the LLM-enrichment spot-check are in
 `../eval_launch_readiness.md`.
 
-The run is `--offline` on purpose so results are deterministic and reproducible;
+The run sets `RAZOR_NO_LLM=1` on purpose so results are deterministic and reproducible;
 the optional LLM pass only rewrites prose wording and does not change detected
 stack, commands, or skills.

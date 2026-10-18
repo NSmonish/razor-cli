@@ -14,6 +14,7 @@ function isProseDoc(name) {
 }
 
 function hasRealKey() {
+  if (process.env.RAZOR_NO_LLM === '1') return false; // internal eval/CI switch
   const k = process.env.GEMINI_API_KEY;
   return !!(k && k !== 'your_actual_key_here');
 }

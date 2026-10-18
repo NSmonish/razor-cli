@@ -175,8 +175,14 @@ function candidateScript(scan, flows) {
 }
 
 // top-level: full scaffold plan for a repo.
-function planScaffold(scan, flows) {
-  const skills = candidateSkills(scan, flows);
+// discovered (optional): repo-specific skills from the LLM discoverer, already
+// validated against the real file list. appended after the deterministic ones
+// so the reliable registry skills come first; dupes by name are dropped.
+function planScaffold(scan, flows, discovered = []) {
+  const registry = candidateSkills(scan, flows);
+  const seen = new Set(registry.map((s) => s.name));
+  const extra = (discovered || []).filter((s) => s && !seen.has(s.name));
+  const skills = [...registry, ...extra];
   const docs = candidateDocs(scan, flows);
   const script = candidateScript(scan, flows);
 

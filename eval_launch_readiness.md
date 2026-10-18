@@ -3,7 +3,7 @@
 **System version tested:** razor-cli v1.0.0, git commit `a84e1ee` for the initial
 run; the two mislabel bugs it surfaced (fastapi, django) were then fixed and
 re-verified (40/40 unit tests). Numbers below are the post-fix results. Command
-run per case: `node index.js scaffold <repo> -o <out> --offline` (deterministic,
+run per case: `RAZOR_NO_LLM=1 node index.js scaffold <repo> -o <out>` (deterministic,
 no LLM — reproducible). Scan label cross-checked with `node index.js scan`.
 
 **Workflow under test:** "Point Razor at a real repository and get a right-sized,
@@ -101,7 +101,7 @@ number to stay honest.
 
 ## LLM-enrichment spot-check (separate from the 20-case eval)
 
-The 20-case eval ran `--offline` (deterministic) on purpose, so the pass rate
+The 20-case eval ran with `RAZOR_NO_LLM=1` (deterministic) on purpose, so the pass rate
 measures the scanner/planner/emitter, not the optional LLM prose pass. The LLM
 pass only rewrites the wording of 4 prose docs (overview/architecture/workflows/
 steering); it never changes detected stack, commands, or skill selection.

@@ -33,6 +33,25 @@ test('detectWorkflows returns all-false on an empty dir (no crash)', () => {
   fs.rmSync(tmp, { recursive: true, force: true });
 });
 
+test('detectWorkflows finds a migrations dir nested below the root', () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'razor-nestedmig-'));
+  fs.mkdirSync(path.join(tmp, 'server', 'data-access', 'migrations'), { recursive: true });
+  const f = detectWorkflows(tmp);
+  assert.equal(f.hasMigrations, true);
+  assert.match(f.evidence.migrations, /migrations/);
+  fs.rmSync(tmp, { recursive: true, force: true });
+});
+
+test('detectWorkflows finds a docker-compose file nested below the root', () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'razor-nesteddocker-'));
+  fs.mkdirSync(path.join(tmp, 'test', 'setup'), { recursive: true });
+  fs.writeFileSync(path.join(tmp, 'test', 'setup', 'docker-compose.yml'), 'services: {}\n');
+  const f = detectWorkflows(tmp);
+  assert.equal(f.hasDocker, true);
+  assert.match(f.evidence.docker, /docker-compose\.yml/);
+  fs.rmSync(tmp, { recursive: true, force: true });
+});
+
 test('detectWorkflows finds a Dockerfile and migrations dir', () => {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'razor-wf2-'));
   fs.writeFileSync(path.join(tmp, 'Dockerfile'), 'FROM node:20\n');

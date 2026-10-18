@@ -1,7 +1,7 @@
 Razor eval results — 20 real repos
 ===================================
 razor-cli: v1.0.0 (post-fix: fastapi/django detection corrected)
-Mode: `node index.js scaffold <repo> --offline` (deterministic, no LLM)
+Mode: `RAZOR_NO_LLM=1 node index.js scaffold <repo>` (deterministic, no LLM)
 Reproduce: `bash eval/run_eval.sh` (clones all 20 and regenerates this file)
 
 Each line: detected stack | skills generated | check.sh command | pack file count.

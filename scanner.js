@@ -214,10 +214,19 @@ function detectPackageManager(files) {
 // pull the handful of commands an agent actually needs (build/test/dev/start/lint)
 function extractScripts(pkg) {
   if (!pkg || !pkg.scripts) return {};
+  const all = pkg.scripts;
   const wanted = ['dev', 'start', 'build', 'test', 'lint', 'typecheck', 'format', 'migrate'];
   const out = {};
   for (const k of wanted) {
-    if (pkg.scripts[k]) out[k] = pkg.scripts[k];
+    if (all[k]) out[k] = all[k];
+  }
+  // migration scripts are commonly namespaced (db:migrate, migrate:up). if we
+  // didn't find an exact `migrate` key, fall back to the first script whose
+  // name contains "migrate". kept narrow on purpose: a broad fuzzy match would
+  // misclassify e.g. test:dev as the dev script.
+  if (!out.migrate) {
+    const hit = Object.keys(all).find((name) => /(^|[:_-])migrate([:_-]|$)/i.test(name));
+    if (hit) out.migrate = all[hit];
   }
   return out;
 }
@@ -368,6 +377,7 @@ function scanRepo(dir) {
     config_files: detectConfigFiles(files),
     sub_projects: subProjects.map((s) => ({ path: s.path, framework: s.framework, language: s.language })),
     file_count: files.length,
+    files, // full relative-path list — used to validate discovered-skill evidence
     evidence: ev,
   };
 }

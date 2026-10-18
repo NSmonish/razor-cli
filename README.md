@@ -40,8 +40,10 @@ Get a free Gemini key at https://aistudio.google.com/apikey
 - `node index.js scaffold [dir]` — scan + generate a full agent context pack.
   - `-o dir` — output directory (default `.agent`).
   - `-t target` — output layout: `agents-md` (default), `kiro`, or `claude`.
-  - `--offline` — skip the LLM pass, deterministic output only.
-  - `-m model` — Gemini model for the prose-enrichment pass.
+  - `-m model` — Gemini model for the prose-enrichment + skill-discovery passes.
+  - The LLM is always used when a key is present: it discovers repo-specific
+    skills and enriches the prose docs. With no key it falls back to the
+    deterministic renderer automatically.
 - `node index.js add-skill <skill> [dir]` — re-scan the repo and add a named
   skill into an existing pack.
   - Known skills: `run-tests`, `lint-fix`, `code-push`, `db-migrations`,
@@ -134,8 +136,8 @@ consuming agent at runtime.
 ```bash
 # single file
 env -u GEMINI_API_KEY node index.js init /path/to/repo -o AGENTS.md
-# full pack, deterministic
-node index.js scaffold /path/to/repo -o .agent --offline
+# full pack (uses the LLM for skill discovery + prose; falls back if no key)
+node index.js scaffold /path/to/repo -o .agent
 ```
 
 ## How it works

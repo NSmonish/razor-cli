@@ -49,6 +49,19 @@ test('scanRepo throws on a path that is not a directory', () => {
   assert.throws(() => scanRepo(path.join(__dirname, 'does-not-exist')));
 });
 
+test('extractScripts captures a namespaced migrate script without misreading test:dev', () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'razor-scripts-'));
+  fs.writeFileSync(path.join(tmp, 'package.json'), JSON.stringify({
+    dependencies: { express: '^4' },
+    scripts: { test: 'jest', 'test:dev': 'jest --watch', lint: 'eslint .', 'db:migrate': 'sequelize-cli db:migrate' },
+  }));
+  const d = scanRepo(tmp);
+  assert.equal(d.scripts.test, 'jest');
+  assert.equal(d.scripts.migrate, 'sequelize-cli db:migrate'); // namespaced migrate caught
+  assert.equal(d.scripts.dev, undefined); // test:dev must NOT be read as the dev script
+  fs.rmSync(tmp, { recursive: true, force: true });
+});
+
 test('fastapi is not mislabeled as Flask (word-boundary + order)', () => {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'razor-fa-'));
   // a pyproject that names fastapi but also mentions flask in an extra

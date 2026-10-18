@@ -11,6 +11,7 @@ const { detectWorkflows } = require('./workflows');
 const { planScaffold, knownSkillNames, buildRequestedSkill } = require('./planner');
 const { emitScaffold, buildDocDrafts, renderSkillFile, layoutFor, buildRoutingManifest } = require('./emitter');
 const { enrichDocs } = require('./enricher');
+const { discoverSkills } = require('./discoverer');
 
 // strict prompt — keep the model terse, no fluff, raw markdown only
 function buildPrompt(repoData) {
@@ -198,32 +199,42 @@ function runCli() {
     .argument('[dir]', 'directory to scan', '.')
     .option('-o, --output <dir>', 'output directory for the context pack', '.agent')
     .option('-t, --target <tool>', 'target format: agents-md | kiro | claude', 'agents-md')
-    .option('--offline', 'skip the LLM enrichment pass (deterministic output only)')
     .option('-m, --model <name>', 'Gemini model for the enrichment pass', 'gemini-3.5-flash-lite')
     .action(async (dir, opts) => {
       console.log(chalk.blue('Razor is scanning the repository...'));
       try {
         const scan = scanRepo(dir);
         const flows = detectWorkflows(dir);
-        const plan = planScaffold(scan, flows);
 
         console.log(chalk.gray(`Detected: ${scan.framework} / ${scan.testing} / ${scan.orm}`));
+
+        // dynamic skill discovery: the LLM proposes repo-specific skills we
+        // never hardcoded, each validated against the real file list. if there's
+        // no key or the call fails, discoverSkills returns [] and the
+        // deterministic registry still produces a full pack.
+        let discovered = [];
+        const disc = await discoverSkills(scan, knownSkillNames(), { model: opts.model });
+        discovered = disc.skills;
+        if (discovered.length) {
+          console.log(chalk.cyan(`Discovered ${discovered.length} repo-specific skill(s): ${discovered.map((s) => s.name).join(', ')}`));
+        } else if (disc.usedLLM) {
+          console.log(chalk.gray('No repo-specific skills discovered beyond the standard set.'));
+        }
+
+        const plan = planScaffold(scan, flows, discovered);
         console.log(chalk.gray(`Plan size: ${plan.size} (docs: ${plan.docs.length}, skills: ${plan.skills.length})`));
 
         // build deterministic drafts first — these are the grounded source of truth
         let docs = buildDocDrafts(scan, flows, plan);
 
-        // optional LLM pass: rewrite prose docs for clarity (facts preserved).
-        // falls back to drafts if --offline, no key, or the call fails.
-        if (!opts.offline) {
-          const scanJson = JSON.stringify(scan, null, 2);
-          const res = await enrichDocs(docs, scanJson, { model: opts.model });
-          docs = res.docs;
-          if (res.usedLLM) console.log(chalk.gray('Enriched prose docs with the LLM.'));
-          else console.log(chalk.yellow('No LLM enrichment (no key or offline) — using grounded drafts.'));
-        } else {
-          console.log(chalk.gray('Offline mode — deterministic output only.'));
-        }
+        // LLM pass: rewrite prose docs for clarity (facts preserved). enrichDocs
+        // self-falls-back to the deterministic drafts if there's no key or the
+        // call fails, so this is always safe to run.
+        const scanJson = JSON.stringify(scan, null, 2);
+        const res = await enrichDocs(docs, scanJson, { model: opts.model });
+        docs = res.docs;
+        if (res.usedLLM) console.log(chalk.gray('Enriched prose docs with the LLM.'));
+        else console.log(chalk.yellow('LLM unavailable (no key or API error) — using grounded drafts.'));
 
         // place files where the chosen target tool expects them
         const result = emitScaffold(scan, flows, plan, opts.output, { target: opts.target, docs });

@@ -13,7 +13,7 @@ git clone --depth 1 https://github.com/goldbergyoni/nodejs-testing-best-practice
 node index.js scan /tmp/repo > scan-output.json
 
 # 2) scaffold — generate the full context pack (deterministic, no LLM)
-node index.js scaffold /tmp/repo -o pack --offline
+node index.js scaffold /tmp/repo -o pack
 ```
 
 ## What's here
@@ -37,5 +37,5 @@ node index.js scaffold /tmp/repo -o pack --offline
   has a git remote + CI; there's no `db-migrations` skill because, although it
   uses Sequelize, no migrations directory was detected.
 - `check.sh` runs the project's actual lint + test commands, not generic ones.
-- This pack was generated with `--offline` so it's fully reproducible; the
+- This pack was generated with RAZOR_NO_LLM=1 so it is fully reproducible; the
   optional LLM pass only polishes the wording of the prose docs.

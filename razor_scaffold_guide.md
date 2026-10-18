@@ -27,8 +27,9 @@ static site gets a couple of files; a big backend gets the full set.
         node --version
 
 - Git (to clone a test repo).
-- A Google Gemini API key (free tier is fine) ONLY if you want the LLM prose
-  polish. Everything works without it using `--offline`. Key:
+- A Google Gemini API key (free tier is fine). The LLM is used to discover
+  repo-specific skills and polish the prose docs. Without a key, Razor falls
+  back to the deterministic renderer automatically. Key:
   https://aistudio.google.com/apikey
 
 ---
@@ -46,8 +47,8 @@ static site gets a couple of files; a big backend gets the full set.
     cp .env.example .env
     # then open .env and set:  GEMINI_API_KEY=your_actual_key_here
 
-`.env` is gitignored — do not commit your key. Skip this step entirely if you
-only plan to use `--offline`.
+`.env` is gitignored — do not commit your key. Without a key the tool still
+runs (deterministic fallback); with a key you get skill discovery + prose polish.
 
 ---
 
@@ -87,13 +88,13 @@ grounding — nothing downstream is invented.
 
 ## 6. Generate the context pack
 
-Deterministic / free (recommended for a first look):
-
-    node index.js scaffold /tmp/myrepo -o /tmp/pack --offline
-
-Or with the LLM prose polish (needs the API key from step 2):
+With the LLM (default — discovers repo-specific skills + polishes prose):
 
     node index.js scaffold /tmp/myrepo -o /tmp/pack
+
+Deterministic / free (no API calls — for a reproducible first look or CI):
+
+    RAZOR_NO_LLM=1 node index.js scaffold /tmp/myrepo -o /tmp/pack
 
 The terminal prints the detected stack, the plan size, and every file written.
 
@@ -168,8 +169,8 @@ Verify: it runs the repo's actual lint/test (or build-system test) commands.
 Different agent tools look for files in different places. The `-t` flag places
 them correctly:
 
-    node index.js scaffold /tmp/myrepo -o /tmp/pack-kiro   -t kiro   --offline
-    node index.js scaffold /tmp/myrepo -o /tmp/pack-claude -t claude --offline
+    node index.js scaffold /tmp/myrepo -o /tmp/pack-kiro   -t kiro
+    node index.js scaffold /tmp/myrepo -o /tmp/pack-claude -t claude
 
     find /tmp/pack-kiro -type f | sort      # docs under .kiro/steering, skills under .kiro/skills
     find /tmp/pack-claude -type f | sort    # skills under .claude/skills
@@ -208,7 +209,7 @@ The routing manifest is regenerated automatically so the new skill is routable.
 - `node index.js scaffold [dir]` — generate the context pack.
   - `-o dir`      output directory (default `.agent`)
   - `-t target`   layout: `agents-md` (default) | `kiro` | `claude`
-  - `--offline`   skip the LLM, deterministic output
+  - (no --offline flag; set env RAZOR_NO_LLM=1 for deterministic output)
   - `-m model`    Gemini model for the prose pass
 - `node index.js add-skill <skill> [dir]` — add a named skill to a pack.
 - `node index.js init [dir]` — the original single-file `AGENTS.md` generator.
@@ -240,9 +241,9 @@ The routing manifest is regenerated automatically so the new skill is routable.
 
 - `command not found` for a package → wrong folder; `cd` into `razor-cli` (the
   one with `index.js`).
-- "Model busy" / 503 → re-run (it retries 3x), or add `--offline`.
-- "API key not valid" → `.env` still has the placeholder; put a real key or use
-  `--offline`.
+- "Model busy" / 503 → re-run (it retries 3x); it also falls back to deterministic output on repeated failure.
+- "API key not valid" → `.env` still has the placeholder; put a real key, or
+  set `RAZOR_NO_LLM=1` for deterministic output with no API calls.
 - Empty / tiny pack → the repo genuinely has little to detect, or it's outside
   the supported stacks (see limitations). Try `node index.js scan <dir>` to see
   what was found.

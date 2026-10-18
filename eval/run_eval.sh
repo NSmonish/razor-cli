@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Razor eval harness — run the scaffold on the 20 launch-eval repos and record
-# what it detected for each. Deterministic (uses --offline), so results are
+# what it detected for each. Deterministic (RAZOR_NO_LLM=1), so results are
 # reproducible. Outputs a results table to eval/results.txt.
 #
 # Usage (from the repo root):
@@ -20,7 +20,7 @@ mkdir -p "$WORK/src" "$WORK/pack"
   echo "Razor eval results"
   echo "Generated: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
   echo "razor-cli commit: $(git -C "$ROOT" rev-parse --short HEAD 2>/dev/null || echo n/a)"
-  echo "Mode: scaffold --offline (deterministic, no LLM)"
+  echo "Mode: scaffold with RAZOR_NO_LLM=1 (deterministic, no LLM)"
   echo "----------------------------------------------------------------------"
 } >> "$OUT"
 
@@ -31,7 +31,7 @@ run_case () {
   if ! git clone --depth 1 "$url" "$d" >/dev/null 2>&1; then
     echo "$name | CLONE_FAILED | $url" >> "$OUT"; return
   fi
-  node "$ROOT/index.js" scaffold "$d" -o "$p" --offline >/dev/null 2>&1 || {
+  RAZOR_NO_LLM=1 node "$ROOT/index.js" scaffold "$d" -o "$p" >/dev/null 2>&1 || {
     echo "$name | SCAFFOLD_FAILED" >> "$OUT"; return; }
 
   node -e '

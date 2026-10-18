@@ -285,6 +285,8 @@ function renderSkill(skill, scan) {
 }
 
 function skillDescription(skill) {
+  // discovered skills carry their own LLM-written description
+  if (skill.discovered && skill.description) return skill.description;
   const map = {
     'run-tests': `Run the test suite (${skill.framework || 'detected test runner'}). Use when verifying changes or before pushing.`,
     'lint-fix': 'Lint and auto-fix code style. Use before committing to keep CI green.',
@@ -297,6 +299,10 @@ function skillDescription(skill) {
 }
 
 function skillSteps(skill, scan) {
+  // discovered skills carry their own validated steps (grounded in a real file)
+  if (skill.discovered && Array.isArray(skill.steps) && skill.steps.length) {
+    return skill.steps.map((s, i) => `${i + 1}. ${s}`);
+  }
   const S = [];
   switch (skill.name) {
     case 'run-tests':
