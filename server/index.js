@@ -162,62 +162,77 @@ ${LOGO(84)}
     const body = `
 <section class="block" style="margin-top:40px">
 <h2>Launch Razor on your repo</h2>
-<p class="muted">From zero to a published skill in about five minutes. You need Node 18+.</p>
+<p class="muted">End to end: from zero to a published skill in about ten minutes. You need Node 18+.</p>
 </section>
 
 <section class="block">
-<h2>1. Install</h2>
-<pre><span class="p">$</span> git clone https://github.com/NSmonish/razor-cli && cd razor-cli
+<h2>0. One-time setup</h2>
+<pre><span class="p">$</span> cd razor-cli
 <span class="p">$</span> npm install</pre>
+<p>Optional, for the LLM features (skill discovery + prose polish) — put a Gemini API key in <code>.env</code>:</p>
+<pre>GEMINI_API_KEY=your_key_here</pre>
+<p class="muted">Get a free key at <a href="https://aistudio.google.com/apikey">aistudio.google.com/apikey</a>. Without a key, Razor still runs and produces a full grounded pack — it just skips the LLM polish and discovery.</p>
 </section>
 
 <section class="block">
-<h2>2. Scan your repo</h2>
-<p>Razor detects your stack — framework, ORM, test runner, scripts, project structure — and records evidence for every detection. Then it generates the pack:</p>
-<pre><span class="p">$</span> node index.js scaffold ./my-repo -o ./pack
-Razor is scanning the repository...
-Detected: Express.js / Jest / Prisma
-Plan size: 9 (docs: 5, skills: 3)
-
-Context pack written to ./pack/ (11 files):
-  AGENTS.md
-  overview.md / architecture.md / workflows.md / steering.md
-  skills/run-tests/SKILL.md
-  skills/db-migrations/SKILL.md
-  skills/lint-fix/SKILL.md
-  scripts/check.sh
-  skills.index.json</pre>
-<p class="muted">The pack works with Cursor, Codex, Copilot, Gemini CLI, Claude Code and other agents via the open AGENTS.md standard.</p>
+<h2>1. Get a repo to run on</h2>
+<pre><span class="p">$</span> git clone https://github.com/goldbergyoni/nodejs-testing-best-practices /tmp/myrepo</pre>
+<p class="muted">Or point Razor at any local repo path.</p>
 </section>
 
 <section class="block">
-<h2>3. Publish your skills</h2>
-<p>Push the generated skills to this registry under your team's namespace so nobody has to regenerate them:</p>
-<pre><span class="p">$</span> node index.js publish ./pack --registry ${origin} --namespace team-alpha
-Publishing 3 skill(s) to ${origin} as @team-alpha ...
-  ✓ team-alpha/run-tests (v1)
-  ✓ team-alpha/db-migrations (v1)
-  ✓ team-alpha/lint-fix (v1)
-
-3/3 published.</pre>
-<p>They show up instantly on the <a href="/skills">Skills page</a>.</p>
+<h2>2. Scan it <span class="muted" style="font-weight:normal">— optional sanity check</span></h2>
+<p>See what Razor detects, with evidence — which file proved each fact:</p>
+<pre><span class="p">$</span> node index.js scan /tmp/myrepo</pre>
+<p class="muted">Prints JSON: language, framework, testing, ORM, scripts, structure, plus an evidence map.</p>
 </section>
 
 <section class="block">
-<h2>4. Pull what you need</h2>
-<p>Anyone on the team — on any machine — pulls just the skill they need:</p>
-<pre><span class="p">$</span> node index.js pull team-alpha/run-tests --registry ${origin} -o .agent
-Pulled team-alpha/run-tests (v1) into .agent/
-  skills/run-tests/SKILL.md</pre>
+<h2>3. Generate the full context pack</h2>
+<pre><span class="p">$</span> node index.js scaffold /tmp/myrepo -o /tmp/mypack</pre>
+<p>This produces the whole pack in <code>/tmp/mypack/</code>: <code>AGENTS.md</code>, layered docs (overview, architecture, workflows, verification, steering), <code>skills/&lt;name&gt;/SKILL.md</code>, <code>scripts/check.sh</code>, and <code>skills.index.json</code>. With a Gemini key, it also discovers repo-specific skills and polishes the prose.</p>
+<p>Pick the layout for your agent tool with <code>-t</code>:</p>
+<pre><span class="p">$</span> node index.js scaffold /tmp/myrepo -o /tmp/mypack -t agents-md   <span class="p">#</span> default: Cursor, Codex, Copilot, Gemini CLI
+<span class="p">$</span> node index.js scaffold /tmp/myrepo -o /tmp/mypack -t claude      <span class="p">#</span> skills under .claude/skills/
+<span class="p">$</span> node index.js scaffold /tmp/myrepo -o /tmp/mypack -t kiro        <span class="p">#</span> docs/skills under .kiro/</pre>
 </section>
 
 <section class="block">
-<h2>Tips</h2>
-<div class="grid3">
-<div class="card"><h3>Republish freely</h3><p class="muted">Publishing the same skill again updates it in place — iterate on your packs without version headaches.</p></div>
-<div class="card"><h3>Namespace per team</h3><p class="muted">Namespaces are lowercase letters, numbers and dashes (max 39 chars). One per team or project keeps things tidy.</p></div>
-<div class="card"><h3>Browse the API</h3><p class="muted"><a href="/api/skills">/api/skills</a> lists everything as JSON — filter with <code>?namespace=</code> or <code>?q=</code>.</p></div>
-</div>
+<h2>4. Look at what it generated</h2>
+<pre><span class="p">$</span> find /tmp/mypack -type f | sort
+<span class="p">$</span> cat /tmp/mypack/AGENTS.md</pre>
+<p>Or view it as an interactive HTML page — click files to see their content:</p>
+<pre><span class="p">$</span> node view_pack.js /tmp/mypack</pre>
+</section>
+
+<section class="block">
+<h2>5. Use the pack with your coding agent</h2>
+<p>Copy the pack contents into your repo root so the agent auto-discovers it:</p>
+<pre><span class="p">$</span> cp -R /tmp/mypack/. /tmp/myrepo/</pre>
+<p>Then open <code>/tmp/myrepo</code> in your agent (Claude Code, Cursor, etc.) — it reads <code>AGENTS.md</code> and loads skills on demand.</p>
+</section>
+
+<section class="block">
+<h2>6. Share skills via the cloud hub <span class="muted" style="font-weight:normal">— optional</span></h2>
+<p>Publish the pack's skills so teammates can reuse them:</p>
+<pre><span class="p">$</span> node index.js publish /tmp/mypack --registry ${origin} --namespace your-team</pre>
+<p>Pull a skill on another machine:</p>
+<pre><span class="p">$</span> node index.js pull your-team/run-tests --registry ${origin} -o /tmp/mypack</pre>
+<p class="muted">Browse what's published: <a href="/api/skills">/api/skills</a> · <a href="/skills">Skills page</a></p>
+</section>
+
+<section class="block">
+<h2>7. Add a specific skill later <span class="muted" style="font-weight:normal">— optional</span></h2>
+<pre><span class="p">$</span> node index.js add-skill db-migrations /tmp/myrepo -o /tmp/mypack</pre>
+<p class="muted">Known skills: run-tests, lint-fix, code-push, db-migrations, local-env, build.</p>
+</section>
+
+<section class="block">
+<h2>The minimal version</h2>
+<p>The three commands that matter:</p>
+<pre><span class="p">$</span> git clone &lt;repo-url&gt; /tmp/myrepo
+<span class="p">$</span> node index.js scaffold /tmp/myrepo -o /tmp/mypack
+<span class="p">$</span> cp -R /tmp/mypack/. /tmp/myrepo/      <span class="p">#</span> then open in your agent</pre>
 </section>
 
 <section class="cta-band">
@@ -227,6 +242,7 @@ Pulled team-alpha/run-tests (v1) into .agent/
 </section>`;
     res.type('html').send(layout({ title: 'Guide', active: 'guide', origin, body }));
   });
+
 
   // ---- Skills: live team registry ----
   app.get('/skills', (req, res) => {
