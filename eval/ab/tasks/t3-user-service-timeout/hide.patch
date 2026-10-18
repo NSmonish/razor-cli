@@ -1,0 +1,32 @@
+diff --git a/example-application/test/createOrder.callingOtherServices.test.ts b/example-application/test/createOrder.callingOtherServices.test.ts
+index dda3eda..8ef15a5 100644
+--- a/example-application/test/createOrder.callingOtherServices.test.ts
++++ b/example-application/test/createOrder.callingOtherServices.test.ts
+@@ -111,27 +111,6 @@ describe('/api', () => {
+     });
+   });
+ 
+-  test("When users service doesn't reply and times out, then return 503", async () => {
+-    //Arrange
+-    // ✅ Best Practice: Let nock fail fast a timeout scenario (or use "fake timers" to simulate long requests withou actually slowing down the tests)
+-    process.env.HTTP_TIMEOUT = '2000';
+-    testSetup.removeUserNock();
+-    nock('http://localhost')
+-      .get('/user/1')
+-      .delay(3000)
+-      .reply(200, { id: 1, name: 'John' });
+-    const orderToAdd = {
+-      userId: 1,
+-      productId: 2,
+-      mode: 'approved',
+-    };
+-
+-    //Act
+-    const response = await testSetup.getHTTPClient().post('/order', orderToAdd);
+-
+-    // //Assert
+-    expect(response.status).toBe(503);
+-  });
+ 
+   //TODO: Fix a bug here
+   test.skip('When users service replies with 503 once and retry mechanism is applied, then an order is added successfully', async () => {

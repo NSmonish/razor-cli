@@ -1,0 +1,29 @@
+{
+  "id": "t2-delete-order",
+  "repo": "nodejs-testing-best-practices",
+  "tags": ["feature", "api-endpoint"],
+  "prompt": "prompt.md",
+  "break": "break.patch",
+  "hide": "hide.patch",
+  "supp_files": {
+    "example-application/test/ab-supp.t2.test.ts": "supp/ab-supp.t2.test.ts"
+  },
+  "acceptance": [
+    {
+      "id": "AC1",
+      "desc": "after DELETE A: GET A is 404 and GET B is 200",
+      "source": "orig",
+      "file": "example-application/test/createOrder.stateCheck.test.ts",
+      "title": "When deleting an existing order, Then it should NOT be retrievable",
+      "null_expect": "fail"
+    },
+    {
+      "id": "AC2",
+      "desc": "DELETE of an existing order responds 204 with an empty body",
+      "source": "supp",
+      "file": "example-application/test/ab-supp.t2.test.ts",
+      "title": "AC2: deleting an existing order responds 204 with an empty body",
+      "null_expect": "fail"
+    }
+  ]
+}

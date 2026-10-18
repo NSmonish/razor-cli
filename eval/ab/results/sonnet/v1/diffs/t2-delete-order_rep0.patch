@@ -1,0 +1,55 @@
+diff --git a/example-application/entry-points/api.ts b/example-application/entry-points/api.ts
+index 4ecc904..b024321 100644
+--- a/example-application/entry-points/api.ts
++++ b/example-application/entry-points/api.ts
+@@ -77,6 +77,17 @@ const defineRoutes = (expressApp: express.Application) => {
+     res.json(response);
+   });
+ 
++  // delete order by id
++  router.delete('/:id', async (req, res, next) => {
++    try {
++      console.log(`Order API was called to delete order ${req.params.id}`);
++      await orderService.deleteOrder(req.params.id);
++      res.status(204).end();
++    } catch (error) {
++      next(error);
++    }
++  });
++
+   expressApp.use('/order', router);
+ 
+   expressApp.use(
+diff --git a/example-application/openapi.json b/example-application/openapi.json
+index 4dd4a36..2f3eea8 100644
+--- a/example-application/openapi.json
++++ b/example-application/openapi.json
+@@ -51,6 +51,28 @@
+             "content": {}
+           }
+         }
++      },
++      "delete": {
++        "summary": "Delete an Order by ID",
++        "description": "Deletes a single order",
++        "operationId": "deleteOrderById",
++        "parameters": [
++          {
++            "name": "orderId",
++            "in": "path",
++            "description": "ID of order to delete",
++            "required": true,
++            "schema": {
++              "type": "integer"
++            }
++          }
++        ],
++        "responses": {
++          "204": {
++            "description": "Order deleted",
++            "content": {}
++          }
++        }
+       }
+     },
+     "/order": {

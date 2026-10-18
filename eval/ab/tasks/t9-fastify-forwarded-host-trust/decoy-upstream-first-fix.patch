@@ -1,0 +1,56 @@
+commit 4e1db5bd0012ccf63a49ff105a63e25981b9a747
+Author: TinkAnet <lzhao61@jh.edu>
+Date:   Thu Mar 5 12:15:57 2026 -0500
+
+    fix: gate host and protocol getters on proxy trust function
+    
+    Ref: GHSA-444r-cwp2-x5xf
+    Co-Authored-By: Matteo Collina <hello@matteocollina.com>
+
+diff --git a/lib/request.js b/lib/request.js
+index f1f4a5e1..fda1f3c8 100644
+--- a/lib/request.js
++++ b/lib/request.js
+@@ -43,18 +43,20 @@ function getTrustProxyFn (tp) {
+   }
+   if (tp === true) {
+     // Support trusting everything
+-    return null
++    return function () { return true }
+   }
+   if (typeof tp === 'number') {
+     // Support trusting hop count
+-    return function (a, i) { return i < tp }
++    return function (a, i) { return a != null && i < tp }
+   }
+   if (typeof tp === 'string') {
+     // Support comma-separated tps
+     const values = tp.split(',').map(it => it.trim())
+-    return proxyAddr.compile(values)
++    const trust = proxyAddr.compile(values)
++    return function (a, i) { return a != null && trust(a, i) }
+   }
+-  return proxyAddr.compile(tp)
++  const trust = proxyAddr.compile(tp)
++  return function (a, i) { return a != null && trust(a, i) }
+ }
+ 
+ function buildRequest (R, trustProxy) {
+@@ -117,7 +119,7 @@ function buildRequestWithTrustProxy (R, trustProxy) {
+     },
+     host: {
+       get () {
+-        if (this.ip !== undefined && this.headers['x-forwarded-host']) {
++        if (this.headers['x-forwarded-host'] && proxyFn(this.raw.socket?.remoteAddress, 0)) {
+           return getLastEntryInMultiHeaderValue(this.headers['x-forwarded-host'])
+         }
+         /**
+@@ -131,7 +133,7 @@ function buildRequestWithTrustProxy (R, trustProxy) {
+     },
+     protocol: {
+       get () {
+-        if (this.headers['x-forwarded-proto']) {
++        if (this.headers['x-forwarded-proto'] && proxyFn(this.raw.socket?.remoteAddress, 0)) {
+           return getLastEntryInMultiHeaderValue(this.headers['x-forwarded-proto'])
+         }
+         if (this.socket) {

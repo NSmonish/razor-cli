@@ -1,0 +1,22 @@
+diff --git a/example-application/business-logic/order-service.js b/example-application/business-logic/order-service.js
+index d77223f..29c9c3d 100644
+--- a/example-application/business-logic/order-service.js
++++ b/example-application/business-logic/order-service.js
+@@ -27,6 +27,17 @@ module.exports.addOrder = async function (newOrder) {
+     );
+   }
+ 
++  // premium users get a 10% discount, rounded up to a whole number
++  if (
++    newOrder.isPremiumUser === true &&
++    typeof newOrder.totalPrice === 'number'
++  ) {
++    newOrder = {
++      ...newOrder,
++      totalPrice: Math.ceil((newOrder.totalPrice * 9) / 10),
++    };
++  }
++
+   // save to DB (Caution: simplistic code without layers and validation)
+   const DBResponse = await new OrderRepository().addOrder(newOrder);
+ 

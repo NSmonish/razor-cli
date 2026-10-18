@@ -1,0 +1,41 @@
+diff --git a/example-application/business-logic/order-service.js b/example-application/business-logic/order-service.js
+index 461bf0d..731719a 100644
+--- a/example-application/business-logic/order-service.js
++++ b/example-application/business-logic/order-service.js
+@@ -63,28 +63,13 @@ module.exports.getOrder = async function (id) {
+ };
+ 
+ async function getUserFromUsersService(userId) {
+-  try {
+-    const getUserResponse = await axiosHTTPClient.get(
+-      `http://localhost/user/${userId}`,
+-      {
+-        timeout: process.env.HTTP_TIMEOUT
+-          ? parseInt(process.env.HTTP_TIMEOUT)
+-          : 2000,
+-        validateStatus: (status) => {
+-          return status < 500;
+-        },
++  const getUserResponse = await axiosHTTPClient.get(
++    `http://localhost/user/${userId}`,
++    {
++      validateStatus: (status) => {
++        return status < 500;
+       },
+-    );
+-    return getUserResponse.data;
+-  } catch (error) {
+-    if (error?.code === 'ECONNABORTED') {
+-      throw new AppError(
+-        'user-verification-failed',
+-        `Request to user service failed so user cant be verified`,
+-        503,
+-      );
+-    }
+-
+-    throw error;
+-  }
++    },
++  );
++  return getUserResponse.data;
+ }

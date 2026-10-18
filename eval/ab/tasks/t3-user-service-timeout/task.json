@@ -1,0 +1,45 @@
+{
+  "id": "t3-user-service-timeout",
+  "repo": "nodejs-testing-best-practices",
+  "tags": ["resilience", "cross-cutting"],
+  "prompt": "prompt.md",
+  "break": "break.patch",
+  "hide": "hide.patch",
+  "supp_files": {
+    "example-application/test/ab-supp.t3.test.ts": "supp/ab-supp.t3.test.ts"
+  },
+  "acceptance": [
+    {
+      "id": "AC1",
+      "desc": "HTTP_TIMEOUT=2000, users service delays 3000 ms -> 503",
+      "source": "orig",
+      "file": "example-application/test/createOrder.callingOtherServices.test.ts",
+      "title": "When users service doesn't reply and times out, then return 503",
+      "null_expect": "fail"
+    },
+    {
+      "id": "AC2",
+      "desc": "HTTP_TIMEOUT=500 set after server start, delay 1000 ms -> 503",
+      "source": "supp",
+      "file": "example-application/test/ab-supp.t3.test.ts",
+      "title": "AC2: HTTP_TIMEOUT set after server start is honoured per request",
+      "null_expect": "fail"
+    },
+    {
+      "id": "AC3",
+      "desc": "HTTP_TIMEOUT unset, delay 1000 ms -> 200 (default not too short; guard)",
+      "source": "supp",
+      "file": "example-application/test/ab-supp.t3.test.ts",
+      "title": "AC3: default timeout is not too short (1000 ms reply succeeds)",
+      "null_expect": "pass"
+    },
+    {
+      "id": "AC4",
+      "desc": "HTTP_TIMEOUT unset, delay 2500 ms -> 503 (default not too long)",
+      "source": "supp",
+      "file": "example-application/test/ab-supp.t3.test.ts",
+      "title": "AC4: default timeout is not too long (2500 ms reply times out)",
+      "null_expect": "fail"
+    }
+  ]
+}

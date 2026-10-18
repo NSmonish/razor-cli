@@ -1,0 +1,68 @@
+{
+  "id": "t10-fastify-remove-raw-header",
+  "repo": "fastify",
+  "commit": "ed664c344f4d7e0171f252d5e886db6d7d241770",
+  "source_fix": "fastify/fastify@e4ffc205 (2026-08-12, #6860): fix: remove raw response headers",
+  "tags": [
+    "real-fix",
+    "hidden-acs",
+    "large-repo"
+  ],
+  "prompt": "prompt.md",
+  "solution": "solution.patch",
+  "supp_files": {
+    "test/internals/reply.test.js": "supp/internals/reply.test.js"
+  },
+  "regression_paths": [
+    "test/internals/reply.test.js",
+    "test/reply-*.test.js"
+  ],
+  "acceptance": [
+    {
+      "id": "AC1",
+      "visibility": "shown",
+      "desc": "removeHeader removes a header set with reply.raw.setHeader (any name casing): gone from getHeader/getHeaders/hasHeader and from the response",
+      "source": "orig",
+      "file": "test/internals/reply.test.js",
+      "title": "reply.removeHeader removes raw headers",
+      "null_expect": "fail"
+    },
+    {
+      "id": "AC2",
+      "visibility": "hidden",
+      "desc": "a header set both on the raw response and through reply.header is fully removed by one removeHeader call",
+      "source": "orig",
+      "file": "test/internals/reply.test.js",
+      "title": "reply.removeHeader removes layered headers",
+      "null_expect": "fail"
+    },
+    {
+      "id": "AC3",
+      "visibility": "hidden",
+      "desc": "removeHeader does not throw once the raw headers have already been sent (hijacked reply) (guard)",
+      "source": "added",
+      "file": "test/internals/reply.test.js",
+      "title": "reply.removeHeader after headers are sent neither throws nor breaks the response",
+      "null_expect": "pass",
+      "leak_strings": [
+        "headerssent",
+        "hijack",
+        "flushheaders",
+        "already been sent",
+        "after the headers"
+      ],
+      "added_reason": "the upstream test for this case passes even when removeHeader throws (the assertion error is swallowed by the hijacked handler); verified with decoy-unguarded.patch"
+    }
+  ],
+  "decoys": [
+    {
+      "patch": "decoy-unguarded.patch",
+      "desc": "forwards to raw.removeHeader without checking headersSent",
+      "expect": {
+        "AC1": "pass",
+        "AC2": "pass",
+        "AC3": "fail"
+      }
+    }
+  ]
+}

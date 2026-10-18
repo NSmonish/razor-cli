@@ -1,0 +1,27 @@
+commit e4ffc205328db294d550c5855d2573b33f5e9d62
+Author: Ram <78085456+Ram-blip@users.noreply.github.com>
+Date:   Wed Aug 12 16:02:56 2026 +0530
+
+    fix: remove raw response headers (#6860)
+    
+    Signed-off-by: Ram-blip <ramcruze2000@gmail.com>
+
+diff --git a/lib/reply.js b/lib/reply.js
+index 9a15d4bd..32fec2a0 100644
+--- a/lib/reply.js
++++ b/lib/reply.js
+@@ -254,9 +254,13 @@ Reply.prototype.hasHeader = function (key) {
+ }
+ 
+ Reply.prototype.removeHeader = function (key) {
++  key = key.toLowerCase()
+   // Node.js does not like headers with keys set to undefined,
+   // so we have to delete the key.
+-  delete this[kReplyHeaders][key.toLowerCase()]
++  delete this[kReplyHeaders][key]
++  if (!this.raw.headersSent) {
++    this.raw.removeHeader(key)
++  }
+   return this
+ }
+ 

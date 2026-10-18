@@ -1,0 +1,86 @@
+diff --git a/lib/request.js b/lib/request.js
+index f1f4a5e..1df8688 100644
+--- a/lib/request.js
++++ b/lib/request.js
+@@ -100,6 +100,13 @@ function buildRequestWithTrustProxy (R, trustProxy) {
+   const _Request = buildRegularRequest(R)
+   const proxyFn = getTrustProxyFn(trustProxy)
+ 
++  // X-Forwarded-Host/-Proto are only honoured when the direct peer is a trusted proxy
++  function isFromTrustedProxy (request) {
++    if (proxyFn === null) return true
++    const socket = request.raw.socket
++    return socket !== undefined && socket !== null && !!proxyFn(socket.remoteAddress, 0)
++  }
++
+   // This is a more optimized version of decoration
+   _Request[kHasBeenDecorated] = true
+ 
+@@ -117,7 +124,7 @@ function buildRequestWithTrustProxy (R, trustProxy) {
+     },
+     host: {
+       get () {
+-        if (this.ip !== undefined && this.headers['x-forwarded-host']) {
++        if (this.headers['x-forwarded-host'] && isFromTrustedProxy(this)) {
+           return getLastEntryInMultiHeaderValue(this.headers['x-forwarded-host'])
+         }
+         /**
+@@ -131,7 +138,7 @@ function buildRequestWithTrustProxy (R, trustProxy) {
+     },
+     protocol: {
+       get () {
+-        if (this.headers['x-forwarded-proto']) {
++        if (this.headers['x-forwarded-proto'] && isFromTrustedProxy(this)) {
+           return getLastEntryInMultiHeaderValue(this.headers['x-forwarded-proto'])
+         }
+         if (this.socket) {
+diff --git a/test/trust-proxy.test.js b/test/trust-proxy.test.js
+index ae7b756..325df71 100644
+--- a/test/trust-proxy.test.js
++++ b/test/trust-proxy.test.js
+@@ -160,3 +160,45 @@ test('trust proxy protocol', async t => {
+   await fetchForwardedRequest(fastifyServer, '1.1.1.1', '/trustproxynoprotocol', undefined)
+   await fetchForwardedRequest(fastifyServer, '1.1.1.1', '/trustproxyprotocols', 'ipsum, dolor')
+ })
++
++test('untrusted direct connection ignores x-forwarded-host/proto', async t => {
++  const configs = [
++    ['ip array', ['10.9.9.9']],
++    ['ip string', '10.9.9.9'],
++    ['function', (address) => address === '10.9.9.9'],
++    ['number 0-hop equivalent', 1, true]
++  ]
++  for (const [name, trustProxy, trusted] of configs) {
++    const app = fastify({ trustProxy })
++    t.after(() => app.close())
++    app.get('/', (req, reply) => {
++      reply.send({ host: req.host, hostname: req.hostname, protocol: req.protocol })
++    })
++    const address = await app.listen({ port: 0, host: '127.0.0.1' })
++    const res = await fetch(address, {
++      headers: { 'X-Forwarded-Host': 'evil.com', 'X-Forwarded-Proto': 'https' }
++    })
++    const body = await res.json()
++    if (trusted) {
++      t.assert.strictEqual(body.host, 'evil.com', name)
++      t.assert.strictEqual(body.protocol, 'https', name)
++    } else {
++      t.assert.strictEqual(body.host, `127.0.0.1:${app.server.address().port}`, name)
++      t.assert.strictEqual(body.hostname, '127.0.0.1', name)
++      t.assert.strictEqual(body.protocol, 'http', name)
++    }
++  }
++})
++
++test('trusted direct connection uses x-forwarded-host/proto', async t => {
++  const app = fastify({ trustProxy: '127.0.0.1' })
++  t.after(() => app.close())
++  app.get('/', (req, reply) => {
++    reply.send({ host: req.host, protocol: req.protocol })
++  })
++  const address = await app.listen({ port: 0, host: '127.0.0.1' })
++  const res = await fetch(address, {
++    headers: { 'X-Forwarded-Host': 'good.com', 'X-Forwarded-Proto': 'https' }
++  })
++  t.assert.deepStrictEqual(await res.json(), { host: 'good.com', protocol: 'https' })
++})

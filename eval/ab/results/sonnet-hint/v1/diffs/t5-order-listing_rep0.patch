@@ -1,0 +1,241 @@
+diff --git a/example-application/business-logic/order-service.js b/example-application/business-logic/order-service.js
+index 461bf0d..89c8964 100644
+--- a/example-application/business-logic/order-service.js
++++ b/example-application/business-logic/order-service.js
+@@ -62,6 +62,10 @@ module.exports.getOrder = async function (id) {
+   return await new OrderRepository().getOrderById(id);
+ };
+ 
++module.exports.listOrders = async function (query) {
++  return await new OrderRepository().listOrders(query);
++};
++
+ async function getUserFromUsersService(userId) {
+   try {
+     const getUserResponse = await axiosHTTPClient.get(
+diff --git a/example-application/data-access/order-repository.js b/example-application/data-access/order-repository.js
+index d56e3e5..c89b6e1 100644
+--- a/example-application/data-access/order-repository.js
++++ b/example-application/data-access/order-repository.js
+@@ -50,6 +50,17 @@ module.exports = class OrderRepository {
+     return await orderModel.findOne({ where: { id } });
+   }
+ 
++  async listOrders({ userId, limit, offset }) {
++    const where = userId === undefined ? {} : { userId };
++    const { rows, count } = await orderModel.findAndCountAll({
++      where,
++      order: [['id', 'ASC']],
++      limit,
++      offset,
++    });
++    return { items: rows, total: count };
++  }
++
+   async addOrder(orderDetails) {
+     const addingResponse = await orderModel.create(orderDetails);
+ 
+diff --git a/example-application/entry-points/api.ts b/example-application/entry-points/api.ts
+index 54fc971..5e9194e 100644
+--- a/example-application/entry-points/api.ts
++++ b/example-application/entry-points/api.ts
+@@ -64,6 +64,45 @@ const defineRoutes = (expressApp: express.Application) => {
+     },
+   );
+ 
++  // list orders, optionally filtered by user, with pagination
++  router.get('/', async (req, res, next) => {
++    try {
++      const parseInteger = (value: unknown): number | null =>
++        typeof value === 'string' && /^-?\d+$/.test(value)
++          ? Number(value)
++          : null;
++      const { userId, limit, offset } = req.query;
++
++      const parsedUserId =
++        userId === undefined ? undefined : parseInteger(userId);
++      const parsedLimit = limit === undefined ? 20 : parseInteger(limit);
++      const parsedOffset = offset === undefined ? 0 : parseInteger(offset);
++
++      if (
++        parsedUserId === null ||
++        parsedLimit === null ||
++        parsedLimit < 1 ||
++        parsedLimit > 100 ||
++        parsedOffset === null ||
++        parsedOffset < 0 ||
++        (parsedUserId !== undefined && !Number.isSafeInteger(parsedUserId)) ||
++        !Number.isSafeInteger(parsedOffset)
++      ) {
++        res.status(400).end();
++        return;
++      }
++
++      const response = await orderService.listOrders({
++        userId: parsedUserId,
++        limit: parsedLimit,
++        offset: parsedOffset,
++      });
++      res.json(response);
++    } catch (error) {
++      next(error);
++    }
++  });
++
+   // get existing order by id
+   router.get('/:id', async (req, res, next) => {
+     console.log(`Order API was called to get order by id ${req.params.id}`);
+diff --git a/example-application/openapi.json b/example-application/openapi.json
+index 4dd4a36..414095b 100644
+--- a/example-application/openapi.json
++++ b/example-application/openapi.json
+@@ -92,6 +92,74 @@
+             "content": {}
+           }
+         }
++      },
++      "get": {
++        "summary": "List Orders",
++        "description": "Returns orders ordered by id ascending, with optional filtering by user and pagination",
++        "operationId": "listOrders",
++        "parameters": [
++          {
++            "name": "userId",
++            "in": "query",
++            "required": false,
++            "description": "Return only orders of this user",
++            "schema": {
++              "type": "integer"
++            }
++          },
++          {
++            "name": "limit",
++            "in": "query",
++            "required": false,
++            "description": "Maximum number of orders to return",
++            "schema": {
++              "type": "integer",
++              "minimum": 1,
++              "maximum": 100,
++              "default": 20
++            }
++          },
++          {
++            "name": "offset",
++            "in": "query",
++            "required": false,
++            "description": "Number of orders to skip",
++            "schema": {
++              "type": "integer",
++              "minimum": 0,
++              "default": 0
++            }
++          }
++        ],
++        "responses": {
++          "200": {
++            "description": "Successful",
++            "content": {
++              "application/json": {
++                "schema": {
++                  "type": "object",
++                  "required": ["items", "total"],
++                  "properties": {
++                    "items": {
++                      "type": "array",
++                      "items": {
++                        "$ref": "#/components/schemas/Order"
++                      }
++                    },
++                    "total": {
++                      "type": "integer",
++                      "description": "Number of orders matching the filter, ignoring pagination"
++                    }
++                  }
++                }
++              }
++            }
++          },
++          "400": {
++            "description": "Invalid query parameter",
++            "content": {}
++          }
++        }
+       }
+     }
+   },
+diff --git a/example-application/test/listOrders.test.ts b/example-application/test/listOrders.test.ts
+new file mode 100644
+index 0000000..3ad6069
+--- /dev/null
++++ b/example-application/test/listOrders.test.ts
+@@ -0,0 +1,69 @@
++import nock from 'nock';
++import { buildOrder } from './order-data-factory';
++import { testSetup } from './setup/test-file-setup';
++
++beforeAll(async () => {
++  await testSetup.start({
++    startAPI: true,
++    disableNetConnect: true,
++    includeTokenInHttpClient: true,
++    mockGetUserCalls: true,
++    mockMailerCalls: true,
++  });
++});
++
++beforeEach(() => {
++  testSetup.resetBeforeEach();
++});
++
++afterAll(async () => {
++  testSetup.tearDownTestFile();
++});
++
++const anyStatus = { validateStatus: () => true };
++
++describe('GET /order', () => {
++  test('When listing, Then items are ordered by id ascending and total ignores pagination', async () => {
++    // Arrange
++    nock('http://localhost')
++      .get('/user/424242')
++      .reply(200, { id: '424242', name: 'Jane' })
++      .persist();
++    const ids: number[] = [];
++    for (let i = 0; i < 3; i++) {
++      const { data } = await testSetup
++        .getHTTPClienForArrange()
++        .post('/order', buildOrder({ userId: 424242 }));
++      ids.push(data.id);
++    }
++
++    // Act
++    const response = await testSetup
++      .getHTTPClient()
++      .get('/order?userId=424242&limit=2&offset=1', anyStatus);
++
++    // Assert
++    expect(response.status).toBe(200);
++    expect(response.data.items.map((o: { id: number }) => o.id)).toEqual(
++      ids.slice(1, 3),
++    );
++    expect(response.data.total).toBe(3);
++  });
++
++  test.each([
++    'userId=abc',
++    'userId=1.5',
++    'limit=0',
++    'limit=101',
++    'limit=x',
++    'offset=-1',
++    'offset=1.2',
++    'limit=',
++  ])('When query is %s, Then responds 400', async (query) => {
++    const response = await testSetup
++      .getHTTPClient()
++      .get(`/order?${query}`, anyStatus);
++
++    expect(response.status).toBe(400);
++  });
++});

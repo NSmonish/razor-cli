@@ -1,0 +1,22 @@
+{
+  "id": "t5-order-listing",
+  "repo": "nodejs-testing-best-practices",
+  "tags": ["feature", "long-horizon", "multi-layer"],
+  "prompt": "prompt.md",
+  "solution": "solution.patch",
+  "supp_files": {
+    "example-application/test/ab-supp.t5.test.ts": "supp/ab-supp.t5.test.ts"
+  },
+  "acceptance": [
+    { "id": "AC1", "desc": "userId filter: exactly that user's orders, id ascending, with total", "source": "supp",
+      "file": "example-application/test/ab-supp.t5.test.ts", "title": "AC1: filtering by userId returns exactly that user's orders, ordered by id, with total", "null_expect": "fail" },
+    { "id": "AC2", "desc": "limit/offset paging; total ignores pagination", "source": "supp",
+      "file": "example-application/test/ab-supp.t5.test.ts", "title": "AC2: limit and offset page through the results; total ignores pagination", "null_expect": "fail" },
+    { "id": "AC3", "desc": "defaults: limit 20, offset 0", "source": "supp",
+      "file": "example-application/test/ab-supp.t5.test.ts", "title": "AC3: limit defaults to 20 and offset to 0", "null_expect": "fail" },
+    { "id": "AC4", "desc": "invalid query values -> 400", "source": "supp",
+      "file": "example-application/test/ab-supp.t5.test.ts", "title": "AC4: invalid query values respond 400", "null_expect": "fail" },
+    { "id": "AC5", "desc": "operation + userId/limit/offset documented in openapi.json", "source": "supp",
+      "file": "example-application/test/ab-supp.t5.test.ts", "title": "AC5: the endpoint and its query parameters are documented in the OpenAPI document", "null_expect": "fail" }
+  ]
+}

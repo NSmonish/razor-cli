@@ -1,0 +1,63 @@
+[
+ {
+  "role": "system",
+  "content": "Claude Code 2.1.296 · model claude-sonnet-5-5 · cwd /private/tmp/razor-ab/runs/hidden-sonnet/t10-fastify-remove-raw-header_rep2_1791902658868/naive"
+ },
+ {
+  "role": "user",
+  "content": "Bug report: `reply.removeHeader()` does not remove headers that were set on the raw\nresponse.\n\nPlugins and compatibility layers often set headers directly on the Node.js response,\ne.g. `reply.raw.setHeader('X-Powered-By', 'legacy')`. Fastify's reply sees those\nheaders: `reply.getHeader('x-powered-by')` returns `'legacy'` and\n`reply.hasHeader('x-powered-by')` is `true`. But\n\n    reply.removeHeader('X-Powered-By')\n\nhas no effect on them: `getHeader` / `hasHeader` still report the header and it is\nstill sent to the client.\n\nExpected behavior: after `reply.removeHeader(name)`, the header is gone, whether it\nwas set through `reply.header()` or directly on `reply.raw`. It is no longer reported\nby `reply.getHeader()`, `reply.getHeaders()` or `reply.hasHeader()`, and it is not\nsent in the response. Header names are case-insensitive, as everywhere else in the\nreply API.\n\nWork within this local repository and the context you have been given. Do not\nlook up this project or its history online.\n\nVerify your work before you finish: add or update automated tests that cover\nthe change, run them together with the existing tests for the code you touched,\nand make sure they pass."
+ },
+ {
+  "role": "tool_call",
+  "name": "Bash",
+  "content": "{\n  \"command\": \"grep -n \\\"removeHeader\\\\|getHeader\\\\b\\\\|hasHeader\\\\|getHeaders\\\\|kReplyHeaders\\\" lib/reply.js | head -50\"\n}"
+ },
+ {
+  "role": "tool_result",
+  "content": "14:  kReplyHeaders,\n73:  this[kReplyHeaders] = {}\n171:  const contentType = ContentType.from(this.getHeader('content-type'))\n189:        this[kReplyHeaders]['content-type'] = CONTENT_TYPE.OCTET\n199:      this[kReplyHeaders]['content-type'] = CONTENT_TYPE.PLAIN\n215:      this[kReplyHeaders]['content-type'] = CONTENT_TYPE.JSON\n223:      this[kReplyHeaders]['content-type'] = `${customContentType}; charset=utf-8`\n237:Reply.prototype.getHeader = function (key) {\n239:  const value = this[kReplyHeaders][key]\n240:  return value !== undefined ? value : this.raw.getHeader(key)\n243:Reply.prototype.getHeaders = function () {\n245:    ...this.raw.getHeaders(),\n246:    ...this[kReplyHeaders]\n250:Reply.prototype.hasHeader = function (key) {\n253:  return this[kReplyHeaders][key] !== undefined || this.raw.hasHeader(key)\n256:Reply.prototype.removeHeader = function (key) {\n259:  delete this[kReplyHeaders][key.toLowerCase()]\n266:  if (this[kReplyHeaders][key] && key === 'set-cookie') {\n268:    if (typeof this[kReplyHeaders][key] === 'string') {\n269:      this[kReplyHeaders][key] = [this[kReplyHeaders][key]]\n273:      Array.prototype.push.apply(this[kReplyHeaders][key], value)\n275:      this[kReplyHeaders][key].push(value)\n278:    this[kReplyHeaders][key] = value\n455:  this[kReplyHeaders]['content-type'] = type\n536:      payload = serialize(reply[kRouteContext], payload, reply.raw.statusCode, reply[kReplyHeaders]['content-type'])\n576:    res.writeHead(statusCode, reply[kReplyHeaders])\n642:      reply[kReplyHeaders]['content-length'] = '0'\n654:    reply.removeHeader('content-type')\n655:    reply.removeHeader('content-length')\n682:    const contentLength = reply[kReplyHeaders]['content-length']\n688:      reply[kReplyHeaders]['content-length'] = '' + Buffer.byteLength(payload)\n773:    for (const key in reply[kReplyHeaders]) {\n774:      res.setHeader(key, reply[kReplyHeaders][key])\n871:    for (const key in reply[kReplyHeaders]) {\n872:      res.setHeader(key, reply[kReplyHeaders][key])\n1015:    this[kReplyHeaders] = {}"
+ },
+ {
+  "role": "tool_call",
+  "name": "Bash",
+  "content": "{\n  \"command\": \"sed -n 235,262p lib/reply.js; grep -n \\\"removeHeader\\\" test/*.js | head\"\n}"
+ },
+ {
+  "role": "tool_result",
+  "content": "}\n\nReply.prototype.getHeader = function (key) {\n  key = key.toLowerCase()\n  const value = this[kReplyHeaders][key]\n  return value !== undefined ? value : this.raw.getHeader(key)\n}\n\nReply.prototype.getHeaders = function () {\n  return {\n    ...this.raw.getHeaders(),\n    ...this[kReplyHeaders]\n  }\n}\n\nReply.prototype.hasHeader = function (key) {\n  key = key.toLowerCase()\n\n  return this[kReplyHeaders][key] !== undefined || this.raw.hasHeader(key)\n}\n\nReply.prototype.removeHeader = function (key) {\n  // Node.js does not like headers with keys set to undefined,\n  // so we have to delete the key.\n  delete this[kReplyHeaders][key.toLowerCase()]\n  return this\n}"
+ },
+ {
+  "role": "tool_call",
+  "name": "Bash",
+  "content": "{\n  \"command\": \"python3 - <<'E'\\np='lib/reply.js'\\ns=open(p).read()\\ns=s.replace(\\\"\\\"\\\"  delete this[kReplyHeaders][key.toLowerCase()]\\n  return this\\\"\\\"\\\",\\\"\\\"\\\"  key = key.toLowerCase()\\n  delete this[kReplyHeaders][key]\\n  // Headers set directly on the raw response are visible through\\n  // getHeader/hasHeader, so they must be removed as well.\\n  if (!this.raw.headersSent) {\\n    this.raw.removeHeader(key)\\n  }\\n  return this\\\"\\\"\\\")\\nopen(p,'w').write(s)\\nE\\ncat >> test/reply-raw-header.test.js <<'E'\\n'use strict'\\n\\nconst { test } = require('node:test')\\nconst Fastify = require('..')\\n\\ntest('reply.removeHeader removes headers set on the raw response', async t => {\\n  const fastify = Fastify()\\n  fastify.get('/', (req, reply) => {\\n    reply.raw.setHeader('X-Powered-By', 'legacy')\\n    reply.raw.setHeader('X-Other', 'keep')\\n    reply.header('x-fastify', 'yes')\\n    t.assert.strictEqual(reply.getHeader('x-powered-by'), 'legacy')\\n    reply.removeHeader('X-POWERED-BY')\\n    reply.removeHeader('X-Fastify')\\n    t.assert.strictEqual(reply.hasHeader('x-powered-by'), false)\\n    t.assert.strictEqual(reply.getHeader('x-powered-by'), undefined)\\n    t.assert.strictEqual(reply.getHeaders()['x-powered-by'], undefined)\\n    t.assert.strictEqual(reply.hasHeader('x-fastify'), false)\\n    reply.send('ok')\\n  })\\n\\n  const res = await fastify.inject('/')\\n  t.assert.strictEqual(res.headers['x-powered-by'], undefined)\\n  t.assert.strictEqual(res.headers['x-fastify'], undefined)\\n  t.assert.strictEqual(res.headers['x-other'], 'keep')\\n})\\nE\\nnode --test test/reply-raw-header.test.js 2>&1 | tail -15; ls test | grep -i \\\"^reply\\\\|header\\\\|remove\\\"|head; ls test/internals | grep reply\"\n}"
+ },
+ {
+  "role": "tool_result",
+  "content": "✔ reply.removeHeader removes headers set on the raw response (82.834ms)\nℹ tests 1\nℹ suites 0\nℹ pass 1\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 200.333875\nheader-overflow.test.js\nreply-code.test.js\nreply-early-hints.test.js\nreply-error.test.js\nreply-raw-header.test.js\nreply-trailers.test.js\nreply-web-stream-locked.test.js\nrequest-header-host.test.js\nreply-serialize.test.js\nreply.test.js"
+ },
+ {
+  "role": "tool_call",
+  "name": "Bash",
+  "content": "{\n  \"command\": \"node --test test/internals/reply.test.js test/internals/reply-serialize.test.js test/reply-*.test.js test/stream*.test.js test/send.test.js test/hooks.test.js test/custom-http-server.test.js 2>&1 | grep -E \\\"^ℹ (tests|pass|fail)|✖\\\" | head\"\n}"
+ },
+ {
+  "role": "tool_call",
+  "name": "Bash",
+  "content": "{\n  \"command\": \"npx eslint lib/reply.js test/reply-raw-header.test.js 2>&1 | tail\"\n}"
+ },
+ {
+  "role": "tool_result",
+  "content": "ℹ tests 330\nℹ pass 330\nℹ fail 0"
+ },
+ {
+  "role": "tool_result",
+  "content": "npm warn Unknown project config \"min-release-age\". This will stop working in the next major version of npm."
+ },
+ {
+  "role": "assistant",
+  "content": "`reply.removeHeader()` now removes headers that were set on the raw response, as well as ones set through `reply.header()`.\n\n- **Fix:** in `lib/reply.js`, `removeHeader` lowercases the name, deletes it from Fastify's own header store, and also calls `raw.removeHeader()`. The raw call is skipped once headers have been sent, since Node would otherwise throw.\n- **Test:** `test/reply-raw-header.test.js` sets a header via `reply.raw.setHeader`, removes it with a differently-cased name, and checks that `getHeader`, `getHeaders` and `hasHeader` no longer report it. It also checks the header is absent from the actual response and that an unrelated raw header is kept.\n- **Results:** the new test passes, as do the existing reply, stream, send, hooks and custom-server tests (330 total, 0 failures). ESLint is clean on the changed files.\n\nI did not run the full test suite, only the reply-related files above."
+ },
+ {
+  "role": "assistant",
+  "content": "[result: success] `reply.removeHeader()` now removes headers that were set on the raw response, as well as ones set through `reply.header()`.\n\n- **Fix:** in `lib/reply.js`, `removeHeader` lowercases the name, deletes it from Fastify's own header store, and also calls `raw.removeHeader()`. The raw call is skipped once headers have been sent, since Node would otherwise throw.\n- **Test:** `test/reply-raw-header.test.js` sets a header via `reply.raw.setHeader`, removes it with a differently-cased name, and checks that `getHeader`, `getHeaders` and `hasHeader` no longer report it. It also checks the header is absent from the actual response and that an unrelated raw header is kept.\n- **Results:** the new test passes, as do the existing reply, stream, send, hooks and custom-server tests (330 total, 0 failures). ESLint is clean on the changed files.\n\nI did not run the full test suite, only the reply-related files above."
+ }
+]

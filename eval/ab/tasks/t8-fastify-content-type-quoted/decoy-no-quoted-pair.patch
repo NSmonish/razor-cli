@@ -1,0 +1,11 @@
+--- a/lib/content-type.js
++++ b/lib/content-type.js
+@@ -11,7 +11,7 @@
+  * @see https://httpwg.org/specs/rfc9110.html#parameter
+  * @type {RegExp}
+  */
+-const keyValuePairsReg = /(?:^|;)\s*([\w!#$%&'*+.^`|~-]+)=([^;]*)/gm
++const keyValuePairsReg = /(?:^|;)\s*([\w!#$%&'*+.^`|~-]+)=("[^"]*"|[^;]*)/gm
+ 
+ /**
+  * typeNameReg is used to validate that the first part of the media-type

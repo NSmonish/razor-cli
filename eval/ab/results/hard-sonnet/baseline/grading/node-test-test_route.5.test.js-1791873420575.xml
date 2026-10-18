@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<testsuites>
+	<testcase name="route child logger factory does not affect other routes" time="0.057611" classname="test"/>
+	<testcase name="route child logger factory overrides global custom error handler" time="0.004263" classname="test"/>
+	<testcase name="Creates a HEAD route for each GET one (default)" time="0.008700" classname="test"/>
+	<testcase name="Do not create a HEAD route for each GET one (exposeHeadRoutes: false)" time="0.002308" classname="test"/>
+	<testcase name="Creates a HEAD route for each GET one" time="0.003823" classname="test"/>
+	<!-- tests 5 -->
+	<!-- suites 0 -->
+	<!-- pass 5 -->
+	<!-- fail 0 -->
+	<!-- cancelled 0 -->
+	<!-- skipped 0 -->
+	<!-- todo 0 -->
+	<!-- duration_ms 190.413292 -->
+</testsuites>

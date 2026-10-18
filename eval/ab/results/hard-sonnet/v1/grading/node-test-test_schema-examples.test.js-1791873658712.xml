@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<testsuites>
+	<testcase name="Example - URI $id" time="0.046578" classname="test"/>
+	<testcase name="Example - string $id" time="0.009545" classname="test"/>
+	<testcase name="Example - get schema" time="0.000517" classname="test"/>
+	<testcase name="Example - get schema encapsulated" time="0.011602" classname="test"/>
+	<testcase name="Example - validation" time="0.010253" classname="test"/>
+	<testcase name="Example - ajv config" time="0.014384" classname="test"/>
+	<testcase name="Example Joi" time="0.024746" classname="test"/>
+	<testcase name="Example yup" time="0.005725" classname="test"/>
+	<testcase name="Example - serialization" time="0.003674" classname="test"/>
+	<testcase name="Example - serialization 2" time="0.001946" classname="test"/>
+	<testcase name="Example - serializator" time="0.000848" classname="test"/>
+	<testcase name="Example - schemas examples" time="0.008355" classname="test"/>
+	<testcase name="should return custom error messages with ajv-errors" time="0.012728" classname="test"/>
+	<testcase name="should be able to handle formats of ajv-formats when added by plugins option" time="0.008003" classname="test"/>
+	<testcase name="should return localized error messages with ajv-i18n" time="0.005766" classname="test"/>
+	<!-- tests 15 -->
+	<!-- suites 0 -->
+	<!-- pass 15 -->
+	<!-- fail 0 -->
+	<!-- cancelled 0 -->
+	<!-- skipped 0 -->
+	<!-- todo 0 -->
+	<!-- duration_ms 248.71225 -->
+</testsuites>

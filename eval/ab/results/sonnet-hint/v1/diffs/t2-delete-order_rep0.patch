@@ -1,0 +1,112 @@
+diff --git a/example-application/entry-points/api.ts b/example-application/entry-points/api.ts
+index 4ecc904..b024321 100644
+--- a/example-application/entry-points/api.ts
++++ b/example-application/entry-points/api.ts
+@@ -77,6 +77,17 @@ const defineRoutes = (expressApp: express.Application) => {
+     res.json(response);
+   });
+ 
++  // delete order by id
++  router.delete('/:id', async (req, res, next) => {
++    try {
++      console.log(`Order API was called to delete order ${req.params.id}`);
++      await orderService.deleteOrder(req.params.id);
++      res.status(204).end();
++    } catch (error) {
++      next(error);
++    }
++  });
++
+   expressApp.use('/order', router);
+ 
+   expressApp.use(
+diff --git a/example-application/openapi.json b/example-application/openapi.json
+index 4dd4a36..2f8d629 100644
+--- a/example-application/openapi.json
++++ b/example-application/openapi.json
+@@ -51,6 +51,28 @@
+             "content": {}
+           }
+         }
++      },
++      "delete": {
++        "summary": "Delete an Order by ID",
++        "description": "Deletes a single order",
++        "operationId": "deleteOrder",
++        "parameters": [
++          {
++            "name": "orderId",
++            "in": "path",
++            "description": "ID of order to delete",
++            "required": true,
++            "schema": {
++              "type": "integer"
++            }
++          }
++        ],
++        "responses": {
++          "204": {
++            "description": "Order deleted",
++            "content": {}
++          }
++        }
+       }
+     },
+     "/order": {
+diff --git a/example-application/test/deleteOrder.test.ts b/example-application/test/deleteOrder.test.ts
+new file mode 100644
+index 0000000..e254ff7
+--- /dev/null
++++ b/example-application/test/deleteOrder.test.ts
+@@ -0,0 +1,51 @@
++import { buildOrder } from './order-data-factory';
++import { testSetup } from './setup/test-file-setup';
++
++beforeAll(async () => {
++  await testSetup.start({
++    startAPI: true,
++    disableNetConnect: true,
++    includeTokenInHttpClient: true,
++    mockGetUserCalls: true,
++    mockMailerCalls: true,
++  });
++});
++
++beforeEach(() => {
++  testSetup.resetBeforeEach();
++});
++
++afterAll(async () => {
++  // ️️️✅ Best Practice: Clean-up resources after each run
++  testSetup.tearDownTestFile();
++});
++
++describe('DELETE /order/:id', () => {
++  test('When deleting an order, Then it responds 204, the order is gone and others are unaffected', async () => {
++    //Arrange
++    const client = testSetup.getHTTPClient();
++    const {
++      data: { id: orderToDeleteId },
++    } = await client.post('/order', {
++      userId: 1,
++      productId: 2,
++      mode: 'approved',
++    });
++    const {
++      data: { id: otherOrderId },
++    } = await client.post('/order', {
++      userId: 1,
++      productId: 3,
++      mode: 'approved',
++    });
++
++    //Act
++    const deleteResponse = await client.delete(`/order/${orderToDeleteId}`);
++
++    //Assert
++    expect(deleteResponse.status).toBe(204);
++    expect(deleteResponse.data).toBe('');
++    expect((await client.get(`/order/${orderToDeleteId}`)).status).toBe(404);
++    expect((await client.get(`/order/${otherOrderId}`)).status).toBe(200);
++  });
++});

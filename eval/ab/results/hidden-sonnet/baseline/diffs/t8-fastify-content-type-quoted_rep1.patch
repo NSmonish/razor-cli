@@ -1,0 +1,78 @@
+diff --git a/lib/content-type.js b/lib/content-type.js
+index f970439..dc66931 100644
+--- a/lib/content-type.js
++++ b/lib/content-type.js
+@@ -6,12 +6,14 @@ const { LruMap: Lru } = require('toad-cache')
+  * keyValuePairsReg is used to split the parameters list into associated
+  * key value pairings. The leading `(?:^|;)\s*` anchor ensures the regex
+  * only attempts matches at parameter boundaries, preventing quadratic
+- * backtracking on malformed input.
++ * backtracking on malformed input. Quoted-string values may contain `;`
++ * and backslash escapes; anything following a closing quote up to the next
++ * `;` is discarded.
+  *
+  * @see https://httpwg.org/specs/rfc9110.html#parameter
+  * @type {RegExp}
+  */
+-const keyValuePairsReg = /(?:^|;)\s*([\w!#$%&'*+.^`|~-]+)=([^;]*)/gm
++const keyValuePairsReg = /(?:^|;)\s*([\w!#$%&'*+.^`|~-]+)=("(?:[^"\\]|\\.)*"|[^;]*)(?:"(?:[^"\\]|\\.)*"|[^;"])*/gm
+ 
+ /**
+  * typeNameReg is used to validate that the first part of the media-type
+@@ -151,7 +153,7 @@ class ContentType {
+         // (https://httpwg.org/specs/rfc9110.html#rule.quoted-string) value.
+         // But we are not really doing much with the parameter values, so we
+         // are omitting that at this time.
+-        this.#parameters.set(key, value.slice(1, value.length - 1))
++        this.#parameters.set(key, value.slice(1, value.length - 1).replace(/\\(.)/g, '$1'))
+       } else {
+         this.#parameters.set(key, value)
+       }
+@@ -178,7 +180,7 @@ class ContentType {
+     if (this.#string) return this.#string
+     const parameters = []
+     for (const [key, value] of this.#parameters.entries()) {
+-      parameters.push(`${key}="${value}"`)
++      parameters.push(`${key}="${value.replace(/["\\]/g, '\\$&')}"`)
+     }
+     const result = [this.#type, '/', this.#subtype]
+     if (parameters.length > 0) {
+diff --git a/test/content-type.test.js b/test/content-type.test.js
+index 1c6b91f..ce6fa77 100644
+--- a/test/content-type.test.js
++++ b/test/content-type.test.js
+@@ -199,3 +199,34 @@ describe('ContentType class cache', () => {
+     t.assert.notEqual(contentType1, contentType2)
+   })
+ })
++
++describe('ContentType quoted parameter values', () => {
++  test('semicolon inside quoted value is part of the value', (t) => {
++    const found = new ContentType('multipart/mixed; boundary="part;one"; charset=utf-8')
++    t.assert.equal(found.parameters.get('boundary'), 'part;one')
++    t.assert.equal(found.parameters.get('charset'), 'utf-8')
++  })
++
++  test('quoted value content is never a separate parameter', (t) => {
++    const found = new ContentType('text/plain; title="lang=en; charset=latin1"')
++    t.assert.equal(found.parameters.get('title'), 'lang=en; charset=latin1')
++    t.assert.equal(found.parameters.has('charset'), false)
++    t.assert.equal(found.parameters.has('lang'), false)
++  })
++
++  test('handles escaped quotes and junk after closing quote', (t) => {
++    let found = new ContentType('text/plain; a="x\\";y=1"; b=2')
++    t.assert.equal(found.parameters.get('a'), 'x";y=1')
++    t.assert.equal(found.parameters.get('b'), '2')
++    t.assert.equal(found.parameters.has('y'), false)
++
++    found = new ContentType('text/plain; a="x"y="p;q=1"; b=2')
++    t.assert.equal(found.parameters.get('a'), 'x')
++    t.assert.equal(found.parameters.has('q'), false)
++  })
++
++  test('toString round-trips quoted values', (t) => {
++    const found = new ContentType('text/plain; a="x\\";y"')
++    t.assert.equal(found.toString(), 'text/plain; a="x\\";y"')
++  })
++})

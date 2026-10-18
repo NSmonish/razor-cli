@@ -1,0 +1,84 @@
+{
+  "id": "t8-fastify-content-type-quoted",
+  "repo": "fastify",
+  "commit": "01ca8393b9d10a897f0d2daedbe2f9eb90076ef5",
+  "source_fix": "fastify/fastify@29bdcbb9 (2026-07-30, #6865): fix: honor quoted-string in Content-Type parameter values",
+  "tags": [
+    "real-fix",
+    "hidden-acs",
+    "large-repo",
+    "hard"
+  ],
+  "prompt": "prompt.md",
+  "solution": "solution.patch",
+  "supp_files": {
+    "test/content-type.test.js": "supp/content-type.test.js",
+    "test/internals/reply.test.js": "supp/internals/reply.test.js"
+  },
+  "supp_note": "content-type.test.js is the post-fix file minus 'skips invalid quoted string parameters', whose expectation the fix changed in a way the issue does not imply (the pre-fix file asserts the old behavior), so it is neither an AC nor a regression.",
+  "regression_paths": [
+    "test/content-type.test.js",
+    "test/content-parser.test.js",
+    "test/internals/content-type-parser.test.js",
+    "test/internals/reply.test.js",
+    "test/reply-media-type.test.js"
+  ],
+  "acceptance": [
+    {
+      "id": "AC1",
+      "visibility": "shown",
+      "desc": "';' inside a quoted parameter value stays part of the value; later parameters still parse",
+      "source": "orig",
+      "file": "test/content-type.test.js",
+      "title": "preserves a semicolon inside a quoted parameter value",
+      "null_expect": "fail"
+    },
+    {
+      "id": "AC2",
+      "visibility": "shown",
+      "desc": "key=value text inside a quoted value never becomes a parameter of its own",
+      "source": "orig",
+      "file": "test/content-type.test.js",
+      "title": "does not leak a fake parameter out of a quoted value",
+      "null_expect": "fail"
+    },
+    {
+      "id": "AC3",
+      "visibility": "hidden",
+      "desc": "quoted-pairs (backslash escapes) inside a quoted-string are unescaped, and an escaped quote does not end the value",
+      "source": "orig",
+      "file": "test/content-type.test.js",
+      "title": "unescapes a quoted-pair inside a quoted-string",
+      "null_expect": "fail",
+      "leak_strings": [
+        "quoted-pair",
+        "backslash",
+        "escape"
+      ]
+    },
+    {
+      "id": "AC4",
+      "visibility": "hidden",
+      "desc": "end to end: reply.send still appends charset=utf-8 when the only 'charset=' is inside a quoted value of another parameter",
+      "source": "orig",
+      "file": "test/internals/reply.test.js",
+      "title": "reply.send should not treat charset= inside a quoted parameter value as an already-declared charset",
+      "null_expect": "fail",
+      "leak_strings": [
+        "reply.send",
+        "charset=fake"
+      ]
+    }
+  ],
+  "decoys": [
+    {
+      "patch": "decoy-no-quoted-pair.patch",
+      "desc": "treats \"...\" as an opaque value but ignores backslash escapes",
+      "expect": {
+        "AC1": "pass",
+        "AC2": "pass",
+        "AC3": "fail"
+      }
+    }
+  ]
+}

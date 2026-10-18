@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<testsuites>
+	<testcase name="should remove content-type for setErrorHandler" time="0.039704" classname="test"/>
+	<testsuite name="ContentType class" time="0.002539" disabled="0" errors="0" tests="9" failures="0" skipped="0" hostname="Sungjoons-MacBook-Pro-7.local">
+		<testcase name="returns empty instance for empty value" time="0.000233" classname="test"/>
+		<testcase name="indicates media type is not correct format" time="0.000197" classname="test"/>
+		<testcase name="subtype with multiple fields validates as incorrect" time="0.000071" classname="test"/>
+		<testcase name="returns a plain media type instance" time="0.000073" classname="test"/>
+		<testcase name="handles empty parameters list" time="0.000052" classname="test"/>
+		<testcase name="returns a media type instance with parameters" time="0.000602" classname="test"/>
+		<testcase name="preserves a semicolon inside a quoted parameter value" time="0.000186" classname="test"/>
+		<testcase name="does not leak a fake parameter out of a quoted value" time="0.000282" classname="test"/>
+		<testcase name="unescapes a quoted-pair inside a quoted-string" time="0.000335" classname="test"/>
+	</testsuite>
+	<testsuite name="ContentType class cache" time="0.000272" disabled="0" errors="0" tests="3" failures="0" skipped="0" hostname="Sungjoons-MacBook-Pro-7.local">
+		<testcase name="allow access cache" time="0.000078" classname="test"/>
+		<testcase name="returns same instance for the same content type string" time="0.000073" classname="test"/>
+		<testcase name="returns different instances for different content type strings" time="0.000060" classname="test"/>
+	</testsuite>
+	<!-- tests 13 -->
+	<!-- suites 2 -->
+	<!-- pass 13 -->
+	<!-- fail 0 -->
+	<!-- cancelled 0 -->
+	<!-- skipped 0 -->
+	<!-- todo 0 -->
+	<!-- duration_ms 136.25875 -->
+</testsuites>

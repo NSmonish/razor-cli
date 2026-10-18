@@ -1,0 +1,177 @@
+diff --git a/example-application/business-logic/order-service.js b/example-application/business-logic/order-service.js
+index 461bf0d..03da929 100644
+--- a/example-application/business-logic/order-service.js
++++ b/example-application/business-logic/order-service.js
+@@ -62,6 +62,16 @@ module.exports.getOrder = async function (id) {
+   return await new OrderRepository().getOrderById(id);
+ };
+ 
++const INT32_MAX = 2147483647;
++
++module.exports.listOrders = async function ({ userId, limit, offset }) {
++  // A user id outside the DB integer range can't match any order
++  if (userId !== undefined && Math.abs(userId) > INT32_MAX) {
++    return { items: [], total: 0 };
++  }
++  return await new OrderRepository().listOrders({ userId, limit, offset });
++};
++
+ async function getUserFromUsersService(userId) {
+   try {
+     const getUserResponse = await axiosHTTPClient.get(
+diff --git a/example-application/data-access/order-repository.js b/example-application/data-access/order-repository.js
+index d56e3e5..c89b6e1 100644
+--- a/example-application/data-access/order-repository.js
++++ b/example-application/data-access/order-repository.js
+@@ -50,6 +50,17 @@ module.exports = class OrderRepository {
+     return await orderModel.findOne({ where: { id } });
+   }
+ 
++  async listOrders({ userId, limit, offset }) {
++    const where = userId === undefined ? {} : { userId };
++    const { rows, count } = await orderModel.findAndCountAll({
++      where,
++      order: [['id', 'ASC']],
++      limit,
++      offset,
++    });
++    return { items: rows, total: count };
++  }
++
+   async addOrder(orderDetails) {
+     const addingResponse = await orderModel.create(orderDetails);
+ 
+diff --git a/example-application/entry-points/api.ts b/example-application/entry-points/api.ts
+index 54fc971..3e1f56e 100644
+--- a/example-application/entry-points/api.ts
++++ b/example-application/entry-points/api.ts
+@@ -41,6 +41,18 @@ export const stopWebServer = async () => {
+   });
+ };
+ 
++// Returns the default (undefined if none) when absent, NaN when not a whole number
++const parseIntegerParam = (value: unknown, defaultValue?: number): number => {
++  if (value === undefined) {
++    return defaultValue as number;
++  }
++  if (typeof value !== 'string' || !/^-?\d+$/.test(value)) {
++    return NaN;
++  }
++  const parsed = Number(value);
++  return Number.isSafeInteger(parsed) ? parsed : NaN;
++};
++
+ const defineRoutes = (expressApp: express.Application) => {
+   const router = express.Router();
+ 
+@@ -64,6 +76,31 @@ const defineRoutes = (expressApp: express.Application) => {
+     },
+   );
+ 
++  // list orders, optionally filtered by user, with pagination
++  router.get('/', async (req, res, next) => {
++    try {
++      const userId = parseIntegerParam(req.query.userId);
++      const limit = parseIntegerParam(req.query.limit, 20);
++      const offset = parseIntegerParam(req.query.offset, 0);
++      if (
++        Number.isNaN(userId) ||
++        Number.isNaN(limit) ||
++        Number.isNaN(offset) ||
++        limit < 1 ||
++        limit > 100 ||
++        offset < 0
++      ) {
++        res.status(400).end();
++        return;
++      }
++      console.log('Order API was called to list orders');
++      const result = await orderService.listOrders({ userId, limit, offset });
++      res.json(result);
++    } catch (error) {
++      next(error);
++    }
++  });
++
+   // get existing order by id
+   router.get('/:id', async (req, res, next) => {
+     console.log(`Order API was called to get order by id ${req.params.id}`);
+diff --git a/example-application/openapi.json b/example-application/openapi.json
+index 4dd4a36..7c8c194 100644
+--- a/example-application/openapi.json
++++ b/example-application/openapi.json
+@@ -92,6 +92,74 @@
+             "content": {}
+           }
+         }
++      },
++      "get": {
++        "summary": "List orders",
++        "description": "Returns orders ordered by id ascending, with pagination",
++        "operationId": "listOrders",
++        "parameters": [
++          {
++            "name": "userId",
++            "in": "query",
++            "required": false,
++            "description": "Only return orders of this user",
++            "schema": {
++              "type": "integer"
++            }
++          },
++          {
++            "name": "limit",
++            "in": "query",
++            "required": false,
++            "description": "Maximum number of orders to return",
++            "schema": {
++              "type": "integer",
++              "minimum": 1,
++              "maximum": 100,
++              "default": 20
++            }
++          },
++          {
++            "name": "offset",
++            "in": "query",
++            "required": false,
++            "description": "Number of orders to skip",
++            "schema": {
++              "type": "integer",
++              "minimum": 0,
++              "default": 0
++            }
++          }
++        ],
++        "responses": {
++          "200": {
++            "description": "Successful",
++            "content": {
++              "application/json": {
++                "schema": {
++                  "type": "object",
++                  "required": ["items", "total"],
++                  "properties": {
++                    "items": {
++                      "type": "array",
++                      "items": {
++                        "$ref": "#/components/schemas/Order"
++                      }
++                    },
++                    "total": {
++                      "type": "integer",
++                      "description": "Number of orders matching the filter, ignoring pagination"
++                    }
++                  }
++                }
++              }
++            }
++          },
++          "400": {
++            "description": "Invalid query parameter",
++            "content": {}
++          }
++        }
+       }
+     }
+   },

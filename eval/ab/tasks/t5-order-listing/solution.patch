@@ -1,0 +1,164 @@
+diff --git a/example-application/business-logic/order-service.js b/example-application/business-logic/order-service.js
+index 461bf0d..d3ab110 100644
+--- a/example-application/business-logic/order-service.js
++++ b/example-application/business-logic/order-service.js
+@@ -58,6 +58,25 @@ module.exports.deleteOrder = async function (id) {
+   return await new OrderRepository().deleteOrder(id);
+ };
+ 
++// query values arrive as strings; only plain non-negative integers are accepted
++function parseNonNegativeInteger(value, name) {
++  if (typeof value !== 'string' || !/^\d+$/.test(value)) {
++    throw new AppError('invalid-query', `${name} must be a non-negative integer`, 400);
++  }
++  return parseInt(value, 10);
++}
++
++module.exports.listOrders = async function (query) {
++  const userId =
++    query.userId === undefined ? undefined : parseNonNegativeInteger(query.userId, 'userId');
++  const limit = query.limit === undefined ? 20 : parseNonNegativeInteger(query.limit, 'limit');
++  const offset = query.offset === undefined ? 0 : parseNonNegativeInteger(query.offset, 'offset');
++  if (limit < 1 || limit > 100) {
++    throw new AppError('invalid-query', 'limit must be between 1 and 100', 400);
++  }
++  return await new OrderRepository().listOrders({ userId, limit, offset });
++};
++
+ module.exports.getOrder = async function (id) {
+   return await new OrderRepository().getOrderById(id);
+ };
+diff --git a/example-application/data-access/order-repository.js b/example-application/data-access/order-repository.js
+index d56e3e5..917bf3c 100644
+--- a/example-application/data-access/order-repository.js
++++ b/example-application/data-access/order-repository.js
+@@ -50,6 +50,17 @@ module.exports = class OrderRepository {
+     return await orderModel.findOne({ where: { id } });
+   }
+ 
++  async listOrders({ userId, limit, offset }) {
++    const where = userId === undefined ? {} : { userId };
++    const { rows, count } = await orderModel.findAndCountAll({
++      where,
++      limit,
++      offset,
++      order: [['id', 'ASC']],
++    });
++    return { items: rows.map((row) => row.dataValues), total: count };
++  }
++
+   async addOrder(orderDetails) {
+     const addingResponse = await orderModel.create(orderDetails);
+ 
+diff --git a/example-application/entry-points/api.ts b/example-application/entry-points/api.ts
+index 54fc971..630329a 100644
+--- a/example-application/entry-points/api.ts
++++ b/example-application/entry-points/api.ts
+@@ -64,6 +64,16 @@ const defineRoutes = (expressApp: express.Application) => {
+     },
+   );
+ 
++  // list orders, optionally filtered by user, with pagination
++  router.get('/', async (req, res, next) => {
++    try {
++      console.log(`Order API was called to list orders ${util.inspect(req.query)}`);
++      res.json(await orderService.listOrders(req.query));
++    } catch (error) {
++      next(error);
++    }
++  });
++
+   // get existing order by id
+   router.get('/:id', async (req, res, next) => {
+     console.log(`Order API was called to get order by id ${req.params.id}`);
+diff --git a/example-application/openapi.json b/example-application/openapi.json
+index 4dd4a36..08d823d 100644
+--- a/example-application/openapi.json
++++ b/example-application/openapi.json
+@@ -92,6 +92,73 @@
+             "content": {}
+           }
+         }
++      },
++      "get": {
++        "summary": "List orders",
++        "description": "Returns orders ordered by id, optionally filtered by user, with pagination",
++        "operationId": "listOrders",
++        "parameters": [
++          {
++            "name": "userId",
++            "in": "query",
++            "description": "Only return orders of this user",
++            "required": false,
++            "schema": {
++              "type": "integer",
++              "minimum": 0
++            }
++          },
++          {
++            "name": "limit",
++            "in": "query",
++            "description": "Page size (1-100, default 20)",
++            "required": false,
++            "schema": {
++              "type": "integer",
++              "minimum": 1,
++              "maximum": 100,
++              "default": 20
++            }
++          },
++          {
++            "name": "offset",
++            "in": "query",
++            "description": "Number of orders to skip (default 0)",
++            "required": false,
++            "schema": {
++              "type": "integer",
++              "minimum": 0,
++              "default": 0
++            }
++          }
++        ],
++        "responses": {
++          "200": {
++            "description": "successful",
++            "content": {
++              "application/json": {
++                "schema": {
++                  "type": "object",
++                  "properties": {
++                    "items": {
++                      "type": "array",
++                      "items": {
++                        "$ref": "#/components/schemas/Order"
++                      }
++                    },
++                    "total": {
++                      "type": "integer"
++                    }
++                  }
++                }
++              }
++            }
++          },
++          "400": {
++            "description": "Invalid query parameters",
++            "content": {}
++          }
++        }
+       }
+     }
+   },
+@@ -99,7 +166,11 @@
+     "schemas": {
+       "Order": {
+         "type": "object",
+-        "required": ["productId", "userId", "mode"],
++        "required": [
++          "productId",
++          "userId",
++          "mode"
++        ],
+         "properties": {
+           "id": {
+             "type": "integer",
