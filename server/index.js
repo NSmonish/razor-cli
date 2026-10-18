@@ -148,6 +148,28 @@ ${LOGO(84)}
 <p class="muted">From 10 user interviews conducted by the Razor team, Fall 2026.</p>
 </section>
 
+<section class="block">
+<h2>Measured results</h2>
+<p class="muted">Side-by-side on the same simulated bug-fix task — same agent, same model, with and without Razor guidance.</p>
+<div class="card" style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:15px">
+<tr style="text-align:left;color:#9aa7bd"><th style="padding:8px 12px">Metric</th><th style="padding:8px 12px">Without Razor</th><th style="padding:8px 12px">With Razor</th></tr>
+<tr style="border-top:1px solid #1c2742"><td style="padding:8px 12px">Token consumption</td><td style="padding:8px 12px">5.5M tokens</td><td style="padding:8px 12px;color:#3ddc84">4.3M tokens</td></tr>
+<tr style="border-top:1px solid #1c2742"><td style="padding:8px 12px">Context used</td><td style="padding:8px 12px">230k average</td><td style="padding:8px 12px;color:#3ddc84">180k average</td></tr>
+<tr style="border-top:1px solid #1c2742"><td style="padding:8px 12px">Time consumed</td><td style="padding:8px 12px">32 minutes</td><td style="padding:8px 12px;color:#3ddc84">12 minutes</td></tr>
+</table></div>
+<p class="muted">Demo on fastify (~79k LOC), simulated bug fix, Sonnet 5.5 on Claude Code. Disclaimer: 3 repetitions of one simulated task — more testing needed for real-world efficacy.</p>
+</section>
+
+<section class="block">
+<h2>Questions, answered</h2>
+<div class="grid3">
+<div class="card"><h3>Does Razor do the coding?</h3><p class="muted">No — your coding agent does. Razor writes the guide it follows.</p></div>
+<div class="card"><h3>Can we inspect the output?</h3><p class="muted">Yes. The guidance is plain readable files: AGENTS.md, topic docs, skills, and check scripts.</p></div>
+<div class="card"><h3>Have you measured savings?</h3><p class="muted">Early results above are promising. We are designing proper trials to measure tokens, context, and time rigorously.</p></div>
+<div class="card"><h3>How do we try it?</h3><p class="muted">Give us 20 minutes: show us a recent task, where you corrected the agent, and what instructions you use. Contact: lc4008@columbia.edu</p></div>
+</div>
+</section>
+
 <section class="cta-band">
 <h2>Stop letting your agent wander the stacks.</h2>
 <p>Generate a context pack for your repo in under a minute.</p>
