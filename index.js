@@ -12,6 +12,9 @@ const { planScaffold, knownSkillNames, buildRequestedSkill } = require('./planne
 const { emitScaffold, buildDocDrafts, renderSkillFile, layoutFor, buildRoutingManifest } = require('./emitter');
 const { enrichDocs } = require('./enricher');
 const { discoverSkills } = require('./discoverer');
+const {
+  readSkillForPublish, listPackSkills, publishSkill, pullSkill, writePulledSkill,
+} = require('./registry-client');
 
 // strict prompt — keep the model terse, no fluff, raw markdown only
 function buildPrompt(repoData) {
@@ -291,6 +294,67 @@ function runCli() {
         console.log(chalk.gray('  routing manifest (skills.index.json) regenerated.'));
       } catch (e) {
         console.error(chalk.red('add-skill failed:'), e.message || e);
+        process.exit(1);
+      }
+    });
+
+  program
+    .command('publish')
+    .description('Publish skills from a context pack to a Razor skill registry')
+    .argument('[pack]', 'the context pack directory (contains skills/)', '.agent')
+    .requiredOption('-r, --registry <url>', 'registry base URL (e.g. https://your-hub.onrender.com)')
+    .requiredOption('-n, --namespace <ns>', 'team namespace to publish under (a-z0-9-)')
+    .option('-s, --skill <name>', 'publish only this one skill (default: all in the pack)')
+    .option('--token <token>', 'publish token (or set PUBLISH_TOKEN env)')
+    .action(async (pack, opts) => {
+      try {
+        const token = opts.token || process.env.PUBLISH_TOKEN;
+        const names = opts.skill ? [opts.skill] : listPackSkills(pack);
+        if (!names.length) {
+          console.error(chalk.red(`No skills found in ${pack}/skills. Run scaffold first.`));
+          process.exit(1);
+        }
+        console.log(chalk.blue(`Publishing ${names.length} skill(s) to ${opts.registry} as @${opts.namespace} ...`));
+        let ok = 0;
+        for (const name of names) {
+          try {
+            const rec = readSkillForPublish(pack, name, opts.namespace);
+            const r = await publishSkill(opts.registry, rec, token);
+            console.log(chalk.green(`  ✓ ${r.published} (v${r.version})`));
+            ok++;
+          } catch (e) {
+            console.log(chalk.red(`  ✗ ${name}: ${e.message}`));
+          }
+        }
+        console.log(chalk.gray(`\n${ok}/${names.length} published.`));
+        if (ok < names.length) process.exit(1);
+      } catch (e) {
+        console.error(chalk.red('Publish failed:'), e.message || e);
+        process.exit(1);
+      }
+    });
+
+  program
+    .command('pull')
+    .description('Pull a skill from a Razor skill registry into a context pack')
+    .argument('<ref>', 'skill reference as <namespace>/<skill>')
+    .requiredOption('-r, --registry <url>', 'registry base URL')
+    .option('-o, --output <dir>', 'the context pack directory to write into', '.agent')
+    .action(async (ref, opts) => {
+      try {
+        const m = ref.match(/^([a-z0-9-]+)\/([a-z][a-z0-9-]+)$/);
+        if (!m) {
+          console.error(chalk.red('ref must look like <namespace>/<skill>, e.g. team-alpha/run-tests'));
+          process.exit(1);
+        }
+        const [, ns, name] = m;
+        console.log(chalk.blue(`Pulling ${ns}/${name} from ${opts.registry} ...`));
+        const rec = await pullSkill(opts.registry, ns, name);
+        const written = writePulledSkill(opts.output, rec);
+        console.log(chalk.green(`Pulled ${ns}/${name} (v${rec.version}) into ${opts.output}/`));
+        for (const f of written) console.log(chalk.gray(`  ${f}`));
+      } catch (e) {
+        console.error(chalk.red('Pull failed:'), e.message || e);
         process.exit(1);
       }
     });
