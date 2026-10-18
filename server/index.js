@@ -189,8 +189,9 @@ ${LOGO(84)}
 
 <section class="block">
 <h2>0. One-time setup</h2>
-<pre><span class="p">$</span> cd razor-cli
-<span class="p">$</span> npm install</pre>
+<pre><span class="p">$</span> git clone https://github.com/NSmonish/razor-cli ~/razor-cli
+<span class="p">$</span> cd ~/razor-cli && npm install</pre>
+<p class="muted">Clone it anywhere you like and leave it there — you run Razor from this folder against any repo.</p>
 <p>Optional, for the LLM features (skill discovery + prose polish) — put a Gemini API key in <code>.env</code>:</p>
 <pre>GEMINI_API_KEY=your_key_here</pre>
 <p class="muted">Get a free key at <a href="https://aistudio.google.com/apikey">aistudio.google.com/apikey</a>. Without a key, Razor still runs and produces a full grounded pack — it just skips the LLM polish and discovery.</p>
@@ -213,8 +214,9 @@ ${LOGO(84)}
 <h2>3. Generate the full context pack</h2>
 <pre><span class="p">$</span> node index.js scaffold /tmp/myrepo -o /tmp/mypack</pre>
 <p>This produces the whole pack in <code>/tmp/mypack/</code>: <code>AGENTS.md</code>, layered docs (overview, architecture, workflows, verification, steering), <code>skills/&lt;name&gt;/SKILL.md</code>, <code>scripts/check.sh</code>, and <code>skills.index.json</code>. With a Gemini key, it also discovers repo-specific skills and polishes the prose.</p>
+<p class="muted">This folder is a staging area — step 5 moves the pack into your repo so your agent actually picks it up.</p>
 <p>Pick the layout for your agent tool with <code>-t</code>:</p>
-<pre><span class="p">$</span> node index.js scaffold /tmp/myrepo -o /tmp/mypack -t agents-md   <span class="p">#</span> default: Cursor, Codex, Copilot, Gemini CLI
+<pre><span class="p">$</span> node index.js scaffold /tmp/myrepo -o /tmp/mypack -t agents-md   <span class="p">#</span> default: Cursor, Codex, Copilot (Gemini CLI: see step 5)
 <span class="p">$</span> node index.js scaffold /tmp/myrepo -o /tmp/mypack -t claude      <span class="p">#</span> skills under .claude/skills/
 <span class="p">$</span> node index.js scaffold /tmp/myrepo -o /tmp/mypack -t kiro        <span class="p">#</span> docs/skills under .kiro/</pre>
 </section>
@@ -228,10 +230,66 @@ ${LOGO(84)}
 </section>
 
 <section class="block">
-<h2>5. Use the pack with your coding agent</h2>
-<p>Copy the pack contents into your repo root so the agent auto-discovers it:</p>
+<h2>5. Make your agent pick it up</h2>
+<p>Your agent only auto-discovers files <b>inside the repo it's working on</b> — so copy the pack from the staging folder into the repo root:</p>
 <pre><span class="p">$</span> cp -R /tmp/mypack/. /tmp/myrepo/</pre>
-<p>Then open <code>/tmp/myrepo</code> in your agent (Claude Code, Cursor, etc.) — it reads <code>AGENTS.md</code> and loads skills on demand.</p>
+<p>How each agent finds the pack:</p>
+<div class="card" style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:15px">
+<tr style="text-align:left;color:#9aa7bd"><th style="padding:8px 12px">Your agent</th><th style="padding:8px 12px">Scaffold with</th><th style="padding:8px 12px">How it picks up the pack</th></tr>
+<tr style="border-top:1px solid #1c2742"><td style="padding:8px 12px">Claude Code</td><td style="padding:8px 12px"><code>-t claude</code></td><td style="padding:8px 12px">Reads <code>AGENTS.md</code> at the repo root (v2.1.277+, when no <code>CLAUDE.md</code> exists); skills in <code>.claude/skills/</code> load on demand</td></tr>
+<tr style="border-top:1px solid #1c2742"><td style="padding:8px 12px">Cursor</td><td style="padding:8px 12px"><code>-t agents-md</code> (default)</td><td style="padding:8px 12px">Reads <code>AGENTS.md</code> at the repo root automatically</td></tr>
+<tr style="border-top:1px solid #1c2742"><td style="padding:8px 12px">Codex CLI</td><td style="padding:8px 12px"><code>-t agents-md</code> (default)</td><td style="padding:8px 12px">Reads <code>AGENTS.md</code> at the repo root automatically (its native format)</td></tr>
+<tr style="border-top:1px solid #1c2742"><td style="padding:8px 12px">GitHub Copilot</td><td style="padding:8px 12px"><code>-t agents-md</code> (default)</td><td style="padding:8px 12px">Reads <code>AGENTS.md</code> at the repo root automatically</td></tr>
+<tr style="border-top:1px solid #1c2742"><td style="padding:8px 12px">Gemini CLI</td><td style="padding:8px 12px"><code>-t agents-md</code> (default)</td><td style="padding:8px 12px">Add <code>@AGENTS.md</code> to your <code>GEMINI.md</code> (or configure it to read <code>AGENTS.md</code>) — it doesn't pick the file up on its own</td></tr>
+<tr style="border-top:1px solid #1c2742"><td style="padding:8px 12px">Kiro</td><td style="padding:8px 12px"><code>-t kiro</code></td><td style="padding:8px 12px">Steering docs in <code>.kiro/steering/</code> and skills in <code>.kiro/skills/</code> load automatically</td></tr>
+</table></div>
+<p class="muted">Scaffolded with the wrong layout? Just re-run with the right <code>-t</code> flag — it takes seconds. Claude Code note: if your repo already has a <code>CLAUDE.md</code>, it wins over <code>AGENTS.md</code> — add <code>@AGENTS.md</code> at the top of <code>CLAUDE.md</code> to load both.</p>
+<h3>Activate it step by step</h3>
+<p>Copying the files gets them in place — here's how to switch each tool onto the pack. Run every command from the repo root (<code>cd /tmp/myrepo</code>).</p>
+
+<p><b>Claude Code</b> <span class="muted">(scaffold with <code>-t claude</code>)</span></p>
+<ol>
+<li>Run <code>claude</code> — <code>AGENTS.md</code> loads automatically (needs v2.1.277+ and no <code>CLAUDE.md</code> present).</li>
+<li>Type <code>/skills</code> to confirm Razor's skills were discovered.</li>
+<li>Skills trigger on their own when your request matches, or call one directly: <code>/run-tests</code>.</li>
+</ol>
+
+<p><b>Cursor</b> <span class="muted">(default <code>-t agents-md</code>)</span></p>
+<ol>
+<li>Open the repo in Cursor — <code>AGENTS.md</code> is picked up automatically.</li>
+<li>Move the skills where Cursor looks: <code>mkdir -p .agents && mv skills .agents/skills</code>.</li>
+<li>Skills trigger automatically, or type <code>/</code> in Agent chat and pick one.</li>
+</ol>
+
+<p><b>Codex CLI</b> <span class="muted">(default <code>-t agents-md</code>)</span></p>
+<ol>
+<li>Run <code>codex</code> — <code>AGENTS.md</code> loads automatically.</li>
+<li>Move the skills where Codex looks: <code>mkdir -p .agents && mv skills .agents/skills</code>.</li>
+<li>Run <code>/skills</code> to confirm, then invoke with <code>$run-tests</code> — or just describe the task and let it match.</li>
+</ol>
+
+<p><b>Gemini CLI</b> <span class="muted">(default <code>-t agents-md</code>)</span></p>
+<ol>
+<li>Add <code>@AGENTS.md</code> to your <code>GEMINI.md</code> — Gemini doesn't pick up <code>AGENTS.md</code> on its own.</li>
+<li>Move the skills where Gemini looks: <code>mkdir -p .agents && mv skills .agents/skills</code>.</li>
+<li><code>/skills list</code> to confirm, <code>/skills reload</code> after changes. Gemini asks for confirmation before activating a skill the first time.</li>
+</ol>
+
+<p><b>GitHub Copilot CLI</b> <span class="muted">(default <code>-t agents-md</code>)</span></p>
+<ol>
+<li>Run <code>copilot</code> in the repo — <code>AGENTS.md</code> is picked up automatically (check with <code>/instructions</code>).</li>
+</ol>
+
+<p><b>Kiro CLI</b> <span class="muted">(scaffold with <code>-t kiro</code>)</span></p>
+<ol>
+<li>Run <code>kiro-cli</code> in the repo — steering docs in <code>.kiro/steering/</code> load automatically.</li>
+<li>Skills trigger on their own when your request matches, or type <code>/</code> and pick one (e.g. <code>/run-tests</code>).</li>
+<li>Optional: define a custom agent in <code>.kiro/agents/&lt;name&gt;.json</code>, then <code>/agent swap &lt;name&gt;</code> to switch to it.</li>
+</ol>
+
+<h3>Verify it's working</h3>
+<p>Open the repo in your agent and ask: <i>"What are this repo's conventions for running tests?"</i> If it answers with the pack's real commands, you're set. Then run the pack's own verification script from the repo root:</p>
+<pre><span class="p">$</span> cd /tmp/myrepo && bash scripts/check.sh</pre>
 </section>
 
 <section class="block">
