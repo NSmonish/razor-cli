@@ -1,0 +1,291 @@
+diff --git a/server/models/Collection.test.ts b/server/models/Collection.test.ts
+index bfce911..fb101b0 100644
+--- a/server/models/Collection.test.ts
++++ b/server/models/Collection.test.ts
+@@ -1,4 +1,5 @@
+ import { randomUUID } from "node:crypto";
++import { EmptyResultError } from "sequelize";
+ import { randomString } from "@shared/random";
+ import slugify from "@shared/utils/slugify";
+ import { createContext } from "@server/context";
+@@ -570,6 +571,17 @@ describe("#findByPk", () => {
+     ).rejects.toThrow(error);
+   });
+ 
++  it("should reject a malformed id when rejectOnEmpty is set", async () => {
++    await expect(
++      Collection.findByPk("invalid", { rejectOnEmpty: true })
++    ).rejects.toThrow(EmptyResultError);
++
++    const error = new Error("does not exist");
++    await expect(
++      Collection.findByPk("invalid", { rejectOnEmpty: error })
++    ).rejects.toThrow(error);
++  });
++
+   it("should not return documentStructure by default", async () => {
+     const collection = await buildCollection();
+     const response = await Collection.findByPk(collection.id);
+diff --git a/server/models/Collection.ts b/server/models/Collection.ts
+index bb0b285..1f0665e 100644
+--- a/server/models/Collection.ts
++++ b/server/models/Collection.ts
+@@ -671,7 +671,8 @@ class Collection extends ParanoidModel<
+     id: Identifier,
+     options: FindOptions<Collection> & AdditionalFindOptions = {}
+   ): Promise<Collection | null> {
+-    if (typeof id !== "string") {
++    // Match Sequelize: a nil id resolves to null, even with rejectOnEmpty.
++    if (id === null || id === undefined) {
+       return null;
+     }
+ 
+@@ -699,7 +700,7 @@ class Collection extends ParanoidModel<
+ 
+     const scope = this.scope(scopes);
+ 
+-    if (isUUID(id)) {
++    if (typeof id === "string" && isUUID(id)) {
+       const collection = await scope.findOne({
+         ...rest,
+         where: {
+@@ -717,7 +718,8 @@ class Collection extends ParanoidModel<
+       return collection;
+     }
+ 
+-    const match = id.match(UrlHelper.SLUG_URL_REGEX);
++    const match =
++      typeof id === "string" ? id.match(UrlHelper.SLUG_URL_REGEX) : null;
+     if (match) {
+       const collection = await scope.findOne({
+         ...rest,
+@@ -736,6 +738,13 @@ class Collection extends ParanoidModel<
+       return collection;
+     }
+ 
++    // The id is neither a UUID nor a valid url slug, so no record can match.
++    if (rest.rejectOnEmpty) {
++      throw rest.rejectOnEmpty instanceof Error
++        ? rest.rejectOnEmpty
++        : new EmptyResultError(`Collection doesn't exist with id: ${id}`);
++    }
++
+     return null;
+   }
+ 
+diff --git a/server/models/Document.test.ts b/server/models/Document.test.ts
+index d6111bf..a0c9ca4 100644
+--- a/server/models/Document.test.ts
++++ b/server/models/Document.test.ts
+@@ -648,6 +648,21 @@ describe("#findByPk", () => {
+     ).rejects.toThrow(EmptyResultError);
+   });
+ 
++  it("should reject a malformed id when rejectOnEmpty is set", async () => {
++    await expect(
++      Document.findByPk("invalid", { rejectOnEmpty: true })
++    ).rejects.toThrow(EmptyResultError);
++
++    const error = new Error("does not exist");
++    await expect(
++      Document.findByPk("invalid", { rejectOnEmpty: error })
++    ).rejects.toThrow(error);
++  });
++
++  it("should return null for a malformed id without rejectOnEmpty", async () => {
++    await expect(Document.findByPk("invalid")).resolves.toBeNull();
++  });
++
+   it("should omit content columns when includeContent is false", async () => {
+     const document = await buildDocument({ text: "# Heading" });
+ 
+diff --git a/server/models/Document.ts b/server/models/Document.ts
+index af5f7d2..ae2e17e 100644
+--- a/server/models/Document.ts
++++ b/server/models/Document.ts
+@@ -922,7 +922,8 @@ class Document extends ArchivableModel<
+     options: (NonNullFindOptions<Document> | FindOptions<Document>) &
+       AdditionalFindOptions = {}
+   ): Promise<Document | null> {
+-    if (typeof id !== "string") {
++    // Match Sequelize: a nil id resolves to null, even with rejectOnEmpty.
++    if (id === null || id === undefined) {
+       return null;
+     }
+ 
+@@ -956,7 +957,7 @@ class Document extends ArchivableModel<
+       },
+     ]);
+ 
+-    if (isUUID(id)) {
++    if (typeof id === "string" && isUUID(id)) {
+       const document = await scope.findOne({
+         ...rest,
+         where: {
+@@ -974,7 +975,8 @@ class Document extends ArchivableModel<
+       return document;
+     }
+ 
+-    const match = id.match(UrlHelper.SLUG_URL_REGEX);
++    const match =
++      typeof id === "string" ? id.match(UrlHelper.SLUG_URL_REGEX) : null;
+     if (match) {
+       const document = await scope.findOne({
+         ...rest,
+@@ -993,6 +995,13 @@ class Document extends ArchivableModel<
+       return document;
+     }
+ 
++    // The id is neither a UUID nor a valid url slug, so no record can match.
++    if (rest.rejectOnEmpty) {
++      throw rest.rejectOnEmpty instanceof Error
++        ? rest.rejectOnEmpty
++        : new EmptyResultError(`Document doesn't exist with id: ${id}`);
++    }
++
+     return null;
+   }
+ 
+diff --git a/server/models/Template.test.ts b/server/models/Template.test.ts
+new file mode 100644
+index 0000000..ba34f94
+--- /dev/null
++++ b/server/models/Template.test.ts
+@@ -0,0 +1,42 @@
++import { EmptyResultError } from "sequelize";
++import slugify from "@shared/utils/slugify";
++import { buildTemplate } from "@server/test/factories";
++import Template from "./Template";
++
++describe("#findByPk", () => {
++  it("should return template by id", async () => {
++    const template = await buildTemplate();
++    const response = await Template.findByPk(template.id);
++    expect(response?.id).toBe(template.id);
++  });
++
++  it("should return template by url slug", async () => {
++    const template = await buildTemplate();
++    const id = `${slugify(template.title)}-${template.urlId}`;
++    const response = await Template.findByPk(id);
++    expect(response?.id).toBe(template.id);
++  });
++
++  it("should return null for a malformed id without rejectOnEmpty", async () => {
++    await expect(Template.findByPk("invalid")).resolves.toBeNull();
++  });
++
++  it("should reject a missing id when rejectOnEmpty is set", async () => {
++    await expect(
++      Template.findByPk("0e8280ea-7b4c-40e5-98ba-ec8a2f00f5e8", {
++        rejectOnEmpty: true,
++      })
++    ).rejects.toThrow(EmptyResultError);
++  });
++
++  it("should reject a malformed id when rejectOnEmpty is set", async () => {
++    await expect(
++      Template.findByPk("invalid", { rejectOnEmpty: true })
++    ).rejects.toThrow(EmptyResultError);
++
++    const error = new Error("does not exist");
++    await expect(
++      Template.findByPk("invalid", { rejectOnEmpty: error })
++    ).rejects.toThrow(error);
++  });
++});
+diff --git a/server/models/Template.ts b/server/models/Template.ts
+index 5c1091e..fb4c72e 100644
+--- a/server/models/Template.ts
++++ b/server/models/Template.ts
+@@ -243,7 +243,8 @@ class Template extends ParanoidModel<
+     options: (NonNullFindOptions<Template> | FindOptions<Template>) &
+       AdditionalFindOptions = {}
+   ): Promise<Template | null> {
+-    if (typeof id !== "string") {
++    // Match Sequelize: a nil id resolves to null, even with rejectOnEmpty.
++    if (id === null || id === undefined) {
+       return null;
+     }
+ 
+@@ -258,7 +259,7 @@ class Template extends ParanoidModel<
+       },
+     ]);
+ 
+-    if (isUUID(id)) {
++    if (typeof id === "string" && isUUID(id)) {
+       const template = await scope.findOne({
+         where: {
+           id,
+@@ -268,13 +269,16 @@ class Template extends ParanoidModel<
+       });
+ 
+       if (!template && rest.rejectOnEmpty) {
+-        throw new EmptyResultError(`Template doesn't exist with id: ${id}`);
++        throw rest.rejectOnEmpty instanceof Error
++          ? rest.rejectOnEmpty
++          : new EmptyResultError(`Template doesn't exist with id: ${id}`);
+       }
+ 
+       return template;
+     }
+ 
+-    const match = id.match(UrlHelper.SLUG_URL_REGEX);
++    const match =
++      typeof id === "string" ? id.match(UrlHelper.SLUG_URL_REGEX) : null;
+     if (match) {
+       const template = await scope.findOne({
+         where: {
+@@ -285,12 +289,21 @@ class Template extends ParanoidModel<
+       });
+ 
+       if (!template && rest.rejectOnEmpty) {
+-        throw new EmptyResultError(`Template doesn't exist with id: ${id}`);
++        throw rest.rejectOnEmpty instanceof Error
++          ? rest.rejectOnEmpty
++          : new EmptyResultError(`Template doesn't exist with id: ${id}`);
+       }
+ 
+       return template;
+     }
+ 
++    // The id is neither a UUID nor a valid url slug, so no record can match.
++    if (rest.rejectOnEmpty) {
++      throw rest.rejectOnEmpty instanceof Error
++        ? rest.rejectOnEmpty
++        : new EmptyResultError(`Template doesn't exist with id: ${id}`);
++    }
++
+     return null;
+   }
+ }
+diff --git a/server/routes/api/urls/urls.test.ts b/server/routes/api/urls/urls.test.ts
+index dd41378..ff5825c 100644
+--- a/server/routes/api/urls/urls.test.ts
++++ b/server/routes/api/urls/urls.test.ts
+@@ -444,6 +444,25 @@ Install instructions here.`
+     expect(body.url).toContain(`/s/${share.id}/doc/`);
+   });
+ 
++  it("should fail with status 404 not found when share url has a malformed document slug", async () => {
++    const collection = await buildCollection({
++      teamId: user.teamId,
++    });
++    const share = await buildShare({
++      teamId: user.teamId,
++      userId: user.id,
++      collectionId: collection.id,
++      published: true,
++    });
++
++    const res = await server.post("/api/urls.unfurl", user, {
++      body: {
++        url: `${env.URL}/s/${share.id}/doc/invalid`,
++      },
++    });
++    expect(res.status).toEqual(404);
++  });
++
+   it("should return 204 for collection share url without document", async () => {
+     const collection = await buildCollection({
+       teamId: user.teamId,

@@ -1,0 +1,38 @@
+{
+  "id": "o4-outline-group-duplicate-names",
+  "repo": "outline",
+  "commit": "c07c03e1a0a1ea5cfb482e1eab8cdca18dea7517",
+  "source_fix": "outline/outline@aacc98475d (2026-09-26, #13894): fix: Sync external groups with duplicate names accurately",
+  "tags": ["real-fix", "hidden-acs", "large-repo", "hard", "multi-file"],
+  "prompt": "prompt.md",
+  "solution": "solution.patch",
+  "supp_files": {
+    "server/commands/groupsSyncer.test.ts": "supp/server/commands/groupsSyncer.test.ts",
+    "server/models/Group.test.ts": "supp/server/models/Group.test.ts"
+  },
+  "regression_paths": ["server/commands/groupsSyncer.test.ts", "server/models/Group.test.ts", "server/routes/api/groups/groups.test.ts"],
+  "acceptance": [
+    { "id": "AC1", "visibility": "shown", "source": "orig",
+      "desc": "two synced groups with one name (plus a manual one) sync, and re-sync in place",
+      "file": "server/commands/groupsSyncer.test.ts",
+      "title": "groupsSyncer > should sync groups with duplicate names accurately", "null_expect": "fail" },
+    { "id": "AC2", "visibility": "shown", "source": "orig",
+      "desc": "same name allowed across different externalIds; same externalId + same name (any case) rejected",
+      "file": "server/models/Group.test.ts",
+      "title": "Group > isUniqueNameInTeam > allows the same name for groups with different externalIds", "null_expect": "fail" },
+    { "id": "AC3", "visibility": "shown", "source": "orig",
+      "desc": "manual groups stay unique, case-insensitively (guard)",
+      "file": "server/models/Group.test.ts",
+      "title": "Group > isUniqueNameInTeam > rejects a name already used in the team, ignoring case", "null_expect": "pass" },
+    { "id": "AC4", "visibility": "hidden", "source": "orig",
+      "desc": "groups synced before the fix (no externalId on the group yet) get it on the next sync",
+      "file": "server/commands/groupsSyncer.test.ts",
+      "title": "groupsSyncer > should backfill externalId on previously synced groups", "null_expect": "fail",
+      "leak_strings": ["backfill", "previously synced", "existing synced"] }
+  ],
+  "decoys": [
+    { "patch": "decoy-no-backfill.patch",
+      "desc": "scopes uniqueness by externalId and stamps it on new synced groups, but never on groups synced earlier",
+      "expect": { "AC1": "pass", "AC2": "pass", "AC3": "pass", "AC4": "fail" } }
+  ]
+}

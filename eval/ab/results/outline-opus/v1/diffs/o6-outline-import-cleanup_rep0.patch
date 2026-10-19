@@ -1,0 +1,260 @@
+diff --git a/server/queues/processors/ImportsProcessor.test.ts b/server/queues/processors/ImportsProcessor.test.ts
+new file mode 100644
+index 0000000..1935576
+--- /dev/null
++++ b/server/queues/processors/ImportsProcessor.test.ts
+@@ -0,0 +1,109 @@
++import { ImportState, IntegrationService } from "@shared/types";
++import { Attachment, Import } from "@server/models";
++import FileStorage from "@server/storage/files";
++import { buildAttachment, buildImport, buildUser } from "@server/test/factories";
++import JSONImportsProcessor from "./JSONImportsProcessor";
++
++const ip = "127.0.0.1";
++
++async function setup(state: ImportState) {
++  const user = await buildUser();
++  const attachment = await buildAttachment({
++    teamId: user.teamId,
++    userId: user.id,
++  });
++  const importModel = await buildImport({
++    service: IntegrationService.JSON,
++    state,
++    integrationId: null,
++    teamId: user.teamId,
++    createdById: user.id,
++    scratch: { storageKey: attachment.key },
++  });
++
++  return { user, attachment, importModel };
++}
++
++describe("ImportsProcessor", () => {
++  describe("imports.processed", () => {
++    it("should delete the uploaded archive and clear scratch on completion", async () => {
++      const deleteFile = vi
++        .spyOn(FileStorage, "deleteFile")
++        .mockResolvedValue(undefined);
++      const { user, attachment, importModel } = await setup(
++        ImportState.Processed
++      );
++      const otherAttachment = await buildAttachment({
++        teamId: user.teamId,
++        userId: user.id,
++      });
++
++      await new JSONImportsProcessor().perform({
++        name: "imports.processed",
++        modelId: importModel.id,
++        teamId: user.teamId,
++        actorId: user.id,
++        ip,
++        changes: { attributes: {}, previous: {} },
++      });
++
++      await importModel.reload();
++      expect(importModel.state).toEqual(ImportState.Completed);
++      expect(importModel.scratch).toBeNull();
++      expect(await Attachment.findByPk(attachment.id)).toBeNull();
++      expect(deleteFile).toHaveBeenCalledWith(attachment.key);
++      expect(await Attachment.findByPk(otherAttachment.id)).not.toBeNull();
++    });
++
++    it("should not delete an attachment belonging to another team", async () => {
++      vi.spyOn(FileStorage, "deleteFile").mockResolvedValue(undefined);
++      const { user, importModel } = await setup(ImportState.Processed);
++      const otherTeamUser = await buildUser();
++      const otherTeamAttachment = await buildAttachment({
++        teamId: otherTeamUser.teamId,
++        userId: otherTeamUser.id,
++      });
++      await importModel.update({
++        scratch: { storageKey: otherTeamAttachment.key },
++      });
++
++      await new JSONImportsProcessor().perform({
++        name: "imports.processed",
++        modelId: importModel.id,
++        teamId: user.teamId,
++        actorId: user.id,
++        ip,
++        changes: { attributes: {}, previous: {} },
++      });
++
++      await importModel.reload();
++      expect(importModel.state).toEqual(ImportState.Completed);
++      expect(await Attachment.findByPk(otherTeamAttachment.id)).not.toBeNull();
++    });
++
++    it.each([ImportState.Errored, ImportState.Canceled])(
++      "should keep the uploaded archive when the import is %s",
++      async (state) => {
++        const deleteFile = vi
++          .spyOn(FileStorage, "deleteFile")
++          .mockResolvedValue(undefined);
++        const { user, attachment, importModel } = await setup(state);
++
++        await new JSONImportsProcessor().perform({
++          name: "imports.processed",
++          modelId: importModel.id,
++          teamId: user.teamId,
++          actorId: user.id,
++          ip,
++          changes: { attributes: {}, previous: {} },
++        });
++
++        const reloaded = await Import.findByPk(importModel.id);
++        expect(reloaded?.state).toEqual(state);
++        expect(reloaded?.scratch).toEqual({ storageKey: attachment.key });
++        expect(await Attachment.findByPk(attachment.id)).not.toBeNull();
++        expect(deleteFile).not.toHaveBeenCalledWith(attachment.key);
++      }
++    );
++  });
++});
+diff --git a/server/queues/processors/ImportsProcessor.ts b/server/queues/processors/ImportsProcessor.ts
+index c1df192..ebe8be8 100644
+--- a/server/queues/processors/ImportsProcessor.ts
++++ b/server/queues/processors/ImportsProcessor.ts
+@@ -25,6 +25,7 @@ import {
+ } from "@shared/types";
+ import { colorPalette } from "@shared/constants";
+ import { UrlHelper } from "@shared/utils/UrlHelper";
++import { errToString } from "@shared/utils/error";
+ import { CollectionValidation } from "@shared/validations";
+ import { createContext } from "@server/context";
+ import { schema } from "@server/editor";
+@@ -203,14 +204,41 @@ export default abstract class ImportsProcessor<
+         await collection.save({ silent: true, transaction });
+       }
+ 
++      // The uploaded archive (if any) is no longer needed once the import has
++      // completed, clear the scratch data and remove the archive.
++      const storageKey = importModel.scratch?.storageKey;
++      const archive = storageKey
++        ? await Attachment.findOne({
++            where: { teamId: importModel.teamId, key: storageKey },
++            transaction,
++          })
++        : null;
++
+       importModel.state = ImportState.Completed;
+       importModel.error = null; // unset any error from previous attempts.
++      importModel.scratch = null;
+       await importModel.saveWithCtx(
+         createContext({
+           user: importModel.createdBy,
+           transaction,
+         })
+       );
++
++      if (archive) {
++        // Delete after commit so the file is only removed from storage once
++        // the import is persisted as completed.
++        transaction.afterCommit(async () => {
++          try {
++            await archive.destroy();
++          } catch (err) {
++            Logger.warn("Failed to delete import archive", {
++              importId: importModel.id,
++              attachmentId: archive.id,
++              message: errToString(err),
++            });
++          }
++        });
++      }
+     } catch (err) {
+       if (err instanceof UniqueConstraintError) {
+         Logger.error(
+diff --git a/server/queues/tasks/APIImportTask.ts b/server/queues/tasks/APIImportTask.ts
+index bfdd0a3..cf6ec39 100644
+--- a/server/queues/tasks/APIImportTask.ts
++++ b/server/queues/tasks/APIImportTask.ts
+@@ -259,8 +259,8 @@ export default abstract class APIImportTask<
+     await sequelize.transaction(async (transaction) => {
+       const associatedImport = importTask.import;
+       associatedImport.state = ImportState.Processed;
+-      // Release any cross-phase scratch state — the import is done with it.
+-      associatedImport.scratch = null;
++      // Scratch state (including the uploaded archive's storageKey) is
++      // retained until the import completes, see ImportsProcessor.
+       await associatedImport.saveWithCtx(
+         createContext({
+           user: associatedImport.createdBy,
+diff --git a/server/queues/tasks/JSONAPIImportTask.test.ts b/server/queues/tasks/JSONAPIImportTask.test.ts
+index b712f63..7e1556e 100644
+--- a/server/queues/tasks/JSONAPIImportTask.test.ts
++++ b/server/queues/tasks/JSONAPIImportTask.test.ts
+@@ -7,18 +7,21 @@ import {
+   Attachment,
+   Collection,
+   Document,
++  Import,
+   ImportTask,
+   User,
+ } from "@server/models";
+ import FileStorage from "@server/storage/files";
+ import {
+   CollectionPermission,
++  ImportState,
+   ImportTaskPhase,
+   ImportTaskState,
+   IntegrationService,
+ } from "@shared/types";
+ import {
+   buildAdmin,
++  buildAttachment,
+   buildDocument,
+   buildImport,
+   buildTeam,
+@@ -228,6 +231,7 @@ async function runImport(opts: {
+   teamId: string;
+   createdById: string;
+   zipPath: string;
++  storageKey?: string;
+ }): Promise<{ importId: string }> {
+   vi.spyOn(FileStorage, "getFileHandle").mockResolvedValue({
+     path: opts.zipPath,
+@@ -242,7 +246,7 @@ async function runImport(opts: {
+     input: [
+       { externalId: randomUUID(), permission: CollectionPermission.Read },
+     ],
+-    scratch: { storageKey: "fixture-key" },
++    scratch: { storageKey: opts.storageKey ?? "fixture-key" },
+   });
+ 
+   // Seed the bootstrap row that JSONImportsProcessor would have created.
+@@ -331,6 +335,32 @@ describe("JSONAPIImportTask", () => {
+     expect(attachments.length).toBeGreaterThanOrEqual(1);
+   });
+ 
++  it("deletes the uploaded archive once the import completes", async () => {
++    const deleteFile = vi
++      .spyOn(FileStorage, "deleteFile")
++      .mockResolvedValue(undefined);
++    const admin = await buildAdmin();
++    const archive = await buildAttachment({
++      teamId: admin.teamId,
++      userId: admin.id,
++    });
++
++    const { importId } = await runImport({
++      teamId: admin.teamId,
++      createdById: admin.id,
++      zipPath: zip.filePath,
++      storageKey: archive.key,
++    });
++
++    const importModel = await Import.findByPk(importId, {
++      rejectOnEmpty: true,
++    });
++    expect(importModel.state).toBe(ImportState.Completed);
++    expect(importModel.scratch).toBeNull();
++    expect(await Attachment.findByPk(archive.id)).toBeNull();
++    expect(deleteFile).toHaveBeenCalledWith(archive.key);
++  });
++
+   it("rewrites internal document links to the new urlIds", async () => {
+     const admin = await buildAdmin();
+     // Pre-create a document with the exported urlId so the importer is

@@ -13,7 +13,7 @@ const path = require('path');
 const crypto = require('crypto');
 const { Command } = require('commander');
 const { AB_DIR, RAZOR_ROOT, WORK_DIR, readJSON, writeJSON, appendJSONL, readJSONL, sh, gitRev, claudeVersion, rmrf, log } = require('./lib/util');
-const { loadTasks, prepareWorkspace, teardownWorkspace } = require('./lib/workspace');
+const { loadTasks, prepareWorkspace, teardownWorkspace, razorPackDir, listPack } = require('./lib/workspace');
 const { gradeWorkspace, captureDiff } = require('./lib/grade');
 const { runAgent } = require('./lib/agent');
 const { computeMetrics, toTurns, MetricsError } = require('./lib/metrics');
@@ -154,6 +154,25 @@ const STATE = {
   ],
 };
 
+// per repo: which pack the razor arm gets. A pinned pack is identified by its
+// content, so editing it can't silently mix two packs in one run.
+function razorPackInfo(tasks) {
+  const out = {};
+  for (const { repoConfig: repo } of tasks) {
+    if (out[repo.name]) continue;
+    const dir = razorPackDir(repo);
+    if (!dir) {
+      out[repo.name] = { source: 'generated', command: 'RAZOR_NO_LLM=1 razor scaffold --target claude' };
+      continue;
+    }
+    const files = listPack(dir);
+    const h = crypto.createHash('sha256');
+    for (const f of files) h.update(f).update(fs.readFileSync(path.join(dir, f)));
+    out[repo.name] = { source: repo.razor_pack, fingerprint: h.digest('hex').slice(0, 16), files: files.length };
+  }
+  return out;
+}
+
 function initFlow(flow, opts, tasks) {
   const metaFile = path.join(flow, 'meta.json');
   const meta = {
@@ -166,6 +185,7 @@ function initFlow(flow, opts, tasks) {
     verify_instruction: verifyInstructionText(opts),
     claude_code_version: claudeVersion(),
     razor_commit: gitRev(RAZOR_ROOT),
+    razor_pack: razorPackInfo(tasks),
     tasks: tasks.map((t) => ({ id: t.id, fingerprint: taskFingerprint(t) })),
     started_at: new Date().toISOString(),
   };
@@ -176,15 +196,28 @@ function initFlow(flow, opts, tasks) {
         throw new Error(`run "${path.basename(flow)}" was started with ${k}=${prev[k]}, now ${meta[k]}. Use a new --name, or --force to mix.`);
       }
     }
+    // runs from before razor_pack was recorded used `scaffold --offline`; a
+    // repo absent from an earlier invocation (other --tasks) is just added
+    for (const [name, pack] of Object.entries(meta.razor_pack)) {
+      const before = prev.razor_pack ? prev.razor_pack[name] : 'scaffold --offline (not recorded)';
+      if (before !== undefined && JSON.stringify(before) !== JSON.stringify(pack) && !opts.force) {
+        throw new Error(`run "${path.basename(flow)}" gave ${name}'s razor arm the pack ${JSON.stringify(before)}, now ${JSON.stringify(pack)}. Use a new --name, or --force to mix.`);
+      }
+    }
+    meta.razor_pack = { ...(prev.razor_pack || {}), ...meta.razor_pack };
     meta.started_at = prev.started_at;
     meta.reps = Math.max(prev.reps || 0, opts.reps);
   }
   writeJSON(metaFile, meta);
   writeJSON(path.join(flow, '_state.json'), STATE);
   fs.mkdirSync(path.join(flow, 'v1'), { recursive: true });
+  const packLines = Object.entries(meta.razor_pack).map(([name, p]) =>
+    p.source === 'generated'
+      ? `- ${name}: generated per workspace with \`${p.command}\``
+      : `- ${name}: pinned pack \`${p.source}\` (${p.files} files, fingerprint ${p.fingerprint}), copied into the repo root`);
   fs.writeFileSync(
     path.join(flow, 'v1', 'change.md'),
-    'Razor context pack added to the workspace (`razor scaffold --target claude --offline`: AGENTS.md, docs, .claude/skills, scripts/check.sh).\n\n`baseline` = naive arm (repo only). Everything else identical.\n',
+    `Razor context pack added to the workspace (AGENTS.md, docs, .claude/skills, skills.index.json, scripts/check.sh):\n\n${packLines.join('\n')}\n\n\`baseline\` = naive arm (repo only). Everything else identical.\n`,
   );
   return meta;
 }
@@ -211,6 +244,11 @@ function buildPrompt(task, arm, meta) {
   return parts.join('\n\n');
 }
 
+// an account usage limit fails every later agent at once, so the run stops
+// there; resuming the same --name later re-runs whatever has no result yet
+const USAGE_LIMIT = /usage[_ ]limit|session limit|API error 429/i;
+let usageLimitHit = null;
+
 const variantOf = (arm) => ARMS.find((a) => a.arm === arm).variant;
 
 function done(flow, arm, taskId, rep) {
@@ -227,6 +265,7 @@ async function runArm(ctx, arm, prepared) {
   log(`${task.id} rep${rep} ${arm}: agent started`);
   const agent = await runAgent({
     ws,
+    repo: task.repoConfig,
     prompt,
     model: opts.model,
     effort: opts.effort,
@@ -253,6 +292,7 @@ async function runArm(ctx, arm, prepared) {
   } catch (e) {
     if (e instanceof MetricsError) {
       errorRow('harness_or_serving', e.message, { exit_code: agent.exitCode });
+      if (USAGE_LIMIT.test(e.message)) usageLimitHit = e.message;
       return;
     }
     throw e;
@@ -408,6 +448,10 @@ async function cmdRun(opts) {
       } finally {
         for (const arm of Object.keys(prepared)) teardownWorkspace(task, prepared[arm].ws, SLOTS[arm], { keep: opts.keepWorkspaces });
         if (!opts.keepWorkspaces) rmrf(runRoot);
+      }
+      if (usageLimitHit) {
+        writeSummary(flow);
+        throw new Error(`stopping: ${usageLimitHit}. Resume later with the same --name.`);
       }
     }
   }

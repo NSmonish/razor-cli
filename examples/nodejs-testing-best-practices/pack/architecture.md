@@ -3,7 +3,7 @@ name: architecture
 kind: doc
 description: non-trivial directory structure
 version: 1
-generated: 2026-10-12
+generated: 2026-10-19
 razor_format: 1.0
 ---
 

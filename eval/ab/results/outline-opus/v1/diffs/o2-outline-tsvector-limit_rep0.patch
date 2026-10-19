@@ -1,0 +1,169 @@
+diff --git a/server/migrations/20261019120000-limit-document-search-vector-size.js b/server/migrations/20261019120000-limit-document-search-vector-size.js
+new file mode 100644
+index 0000000..d326257
+--- /dev/null
++++ b/server/migrations/20261019120000-limit-document-search-vector-size.js
+@@ -0,0 +1,66 @@
++"use strict";
++
++/** @type {import('sequelize-cli').Migration} */
++module.exports = {
++  async up(queryInterface) {
++    // Postgres limits the size of a tsvector (~1MB), not the size of its input.
++    // Text made of mostly unique tokens (hashes, IDs, base64, tables of
++    // numbers) can exceed that limit well before the 1,000,000 character cap.
++    // When that happens, index the longest prefix of the text that fits while
++    // still indexing the title and previous titles in full.
++    await queryInterface.sequelize.query(`
++    CREATE OR REPLACE FUNCTION documents_search_trigger() RETURNS trigger AS $$
++    declare
++      titles_vector tsvector;
++      body text;
++      fits integer;
++      too_long integer;
++      candidate integer;
++    begin
++      titles_vector :=
++        setweight(to_tsvector('english', coalesce(new.title, '')),'A') ||
++        setweight(to_tsvector('english', coalesce(array_to_string(new."previousTitles", ' , '),'')),'C');
++      body := substring(coalesce(new.text, ''), 1, 1000000);
++
++      begin
++        new."searchVector" := titles_vector || setweight(to_tsvector('english', body), 'D');
++        return new;
++      exception when program_limit_exceeded then
++        -- fall through to index a prefix of the text
++      end;
++
++      -- Binary search for the longest prefix of the text that fits, to within
++      -- 1,000 characters.
++      fits := 0;
++      too_long := length(body);
++      while too_long - fits > 1000 loop
++        candidate := fits + (too_long - fits) / 2;
++        begin
++          perform titles_vector || to_tsvector('english', substring(body, 1, candidate));
++          fits := candidate;
++        exception when program_limit_exceeded then
++          too_long := candidate;
++        end;
++      end loop;
++
++      new."searchVector" := titles_vector || setweight(to_tsvector('english', substring(body, 1, fits)), 'D');
++      return new;
++    end
++    $$ LANGUAGE plpgsql;
++    `);
++  },
++
++  async down(queryInterface) {
++    await queryInterface.sequelize.query(`
++    CREATE OR REPLACE FUNCTION documents_search_trigger() RETURNS trigger AS $$
++    begin
++      new."searchVector" :=
++        setweight(to_tsvector('english', coalesce(new.title, '')),'A') ||
++        setweight(to_tsvector('english', coalesce(array_to_string(new."previousTitles", ' , '),'')),'C') ||
++        setweight(to_tsvector('english', substring(coalesce(new.text, ''), 1, 1000000)), 'D');
++      return new;
++    end
++    $$ LANGUAGE plpgsql;
++    `);
++  },
++};
+diff --git a/server/models/Document.test.ts b/server/models/Document.test.ts
+index 0aa8aca..4fa8729 100644
+--- a/server/models/Document.test.ts
++++ b/server/models/Document.test.ts
+@@ -1,4 +1,5 @@
+-import { EmptyResultError, Op } from "sequelize";
++import { createHash } from "node:crypto";
++import { EmptyResultError, Op, QueryTypes } from "sequelize";
+ import { CollectionPermission, DocumentPermission } from "@shared/types";
+ import slugify from "@shared/utils/slugify";
+ import { parser } from "@server/editor";
+@@ -167,6 +168,85 @@ describe("#save", () => {
+   });
+ });
+ 
++describe("searchVector", () => {
++  // Text of unique tokens that is under the 1,000,000 character cap of the
++  // search trigger, but produces a tsvector over Postgres' ~1MB size limit.
++  const tokens = Array.from({ length: 29000 }, (_, i) =>
++    createHash("md5").update(String(i)).digest("hex")
++  );
++  const largeText = tokens.join(" ");
++
++  const getSearchVector = async (id: string) => {
++    const [row] = await sequelize.query<{ searchVector: string }>(
++      `SELECT "searchVector"::text AS "searchVector" FROM documents WHERE id = :id`,
++      { type: QueryTypes.SELECT, replacements: { id } }
++    );
++    return row.searchVector;
++  };
++
++  const matches = async (id: string, query: string) => {
++    const [row] = await sequelize.query<{ matches: boolean }>(
++      `SELECT "searchVector" @@ plainto_tsquery('english', :query) AS matches FROM documents WHERE id = :id`,
++      { type: QueryTypes.SELECT, replacements: { id, query } }
++    );
++    return row.matches;
++  };
++
++  test("should index the full text when it fits", async () => {
++    const document = await buildDocument({
++      title: "Quokka",
++      previousTitles: ["Wombat"],
++      text: "Kangaroo platypus",
++    });
++
++    const searchVector = await getSearchVector(document.id);
++    expect(searchVector).toMatch(/'quokka':\d+A/);
++    expect(searchVector).toMatch(/'wombat':\d+C/);
++    expect(searchVector).toMatch(/'kangaroo':\d+(?![A-C])/);
++    expect(searchVector).toMatch(/'platypus':\d+(?![A-C])/);
++  });
++
++  test("should save text that produces a search vector over the size limit", async () => {
++    expect(largeText.length).toBeLessThan(1000000);
++
++    const document = await buildDocument({
++      title: "Quokka",
++      previousTitles: ["Wombat"],
++      content: parser.parse("Small")?.toJSON(),
++      text: largeText,
++    });
++
++    const searchVector = await getSearchVector(document.id);
++    expect(searchVector).toMatch(/'quokka':\d+A/);
++    expect(searchVector).toMatch(/'wombat':\d+C/);
++    expect(await matches(document.id, tokens[0])).toBe(true);
++    expect(await matches(document.id, tokens[1000])).toBe(true);
++    expect(await matches(document.id, tokens[tokens.length - 1])).toBe(false);
++  });
++
++  test("should update text that produces a search vector over the size limit", async () => {
++    const document = await buildDocument({
++      title: "Quokka",
++      previousTitles: ["Wombat"],
++      text: "Kangaroo",
++    });
++
++    await Document.update(
++      { text: largeText },
++      { where: { id: document.id }, hooks: false }
++    );
++    await document.reload();
++    expect(document.text).toEqual(largeText);
++
++    const searchVector = await getSearchVector(document.id);
++    expect(searchVector).toMatch(/'quokka':\d+A/);
++    expect(searchVector).toMatch(/'wombat':\d+C/);
++    expect(searchVector).not.toContain("'kangaroo'");
++    expect(await matches(document.id, tokens[0])).toBe(true);
++    expect(await matches(document.id, tokens[tokens.length - 1])).toBe(false);
++  });
++});
++
+ describe("#findAllChildDocumentIds", () => {
+   test("should return empty array if no children", async () => {
+     const team = await buildTeam();

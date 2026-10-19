@@ -1,0 +1,232 @@
+[
+ {
+  "role": "system",
+  "content": "Claude Code 2.1.303 · model claude-opus-5-5 · cwd /private/tmp/razor-ab/runs/outline-opus/o2-outline-tsvector-limit_rep1_1792426187231/naive"
+ },
+ {
+  "role": "user",
+  "content": "Saving some documents fails with a Postgres error. It happens when the text is\nmostly unique tokens: hashes, IDs, base64, long tables of numbers. The document\nsearch trigger caps its input at 1,000,000 characters, but Postgres's tsvector\nsize limit applies to the output, so a document under the cap can still produce\na search vector that's too big. The save errors out, the worker task that\nrefreshes the document text keeps retrying and failing, and the text and search\nindex go stale.\n\nSaving such a document must succeed. When the full text produces a search\nvector that is too large, index as much of the text as fits instead (at least\nthe beginning of the text). The title and the previous titles must still be\nfully indexed, with their usual weights.\n\nWork within this local repository and the context you have been given. Do not\nlook up this project or its history online.\n\nVerify your work before you finish: add or update automated tests that cover\nthe change, run them together with the existing tests for the code you touched,\nand make sure they pass."
+ },
+ {
+  "role": "tool_call",
+  "name": "Bash",
+  "content": "{\n  \"command\": \"cd /private/tmp/razor-ab/runs/outline-opus/o2-outline-tsvector-limit_rep1_1792426187231/naive; grep -rln \\\"1000000\\\\|tsvector\\\" server --include=*.js --include=*.ts | head -30\"\n}"
+ },
+ {
+  "role": "tool_result",
+  "content": "(eval):1: no matches found: --include=*.js"
+ },
+ {
+  "role": "tool_call",
+  "name": "Bash",
+  "content": "{\n  \"command\": \"cd /private/tmp/razor-ab/runs/outline-opus/o2-outline-tsvector-limit_rep1_1792426187231/naive; grep -rln \\\"1000000\\\\|tsvector\\\\|searchVector\\\" server | head -30\"\n}"
+ },
+ {
+  "role": "tool_result",
+  "content": "server/env.ts\nserver/migrations/20160711071958-search-index.js\nserver/migrations/20231227040129-update-tsvector-trigger.js\nserver/migrations/20210716071454-search-index-previousTitles.js\nserver/migrations/20260803143858-add-documents-team-search-vector-index.js\nserver/migrations/20251217161051-remove-unused-indexes.js\nserver/migrations/20260902125149-limit-document-search-trigger-columns.js\nserver/migrations/20230204191035-update-tsvector-trigger.js\nserver/utils/VerificationCode.ts\nserver/utils/BaseSearchProvider.ts\nserver/storage/redis.ts\nserver/storage/files/BaseStorage.test.ts\nserver/queues/tasks/base/CronTask.test.ts\nserver/queues/tasks/base/CronTask.ts\nserver/queues/processors/SearchIndexProcessor.ts\nserver/commands/documentPermanentDeleter.ts"
+ },
+ {
+  "role": "tool_call",
+  "name": "Bash",
+  "content": "{\n  \"command\": \"cd /private/tmp/razor-ab/runs/outline-opus/o2-outline-tsvector-limit_rep1_1792426187231/naive; cat server/migrations/20260902125149-limit-document-search-trigger-columns.js server/migrations/20231227040129-update-tsvector-trigger.js; ls server/migrations | tail -5; grep -n \\\"1000000\\\\|searchVector\\\" -r server --include=\\\"*.ts\\\" | head\"\n}"
+ },
+ {
+  "role": "tool_result",
+  "content": "\"use strict\";\n\n/** @type {import('sequelize-cli').Migration} */\nmodule.exports = {\n  async up(queryInterface) {\n    await queryInterface.sequelize.query(\n      'CREATE OR REPLACE TRIGGER documents_tsvectorupdate BEFORE INSERT OR UPDATE OF title, text, \"previousTitles\" ON documents FOR EACH ROW EXECUTE PROCEDURE documents_search_trigger();'\n    );\n  },\n\n  async down(queryInterface) {\n    await queryInterface.sequelize.query(\n      \"CREATE OR REPLACE TRIGGER documents_tsvectorupdate BEFORE INSERT OR UPDATE ON documents FOR EACH ROW EXECUTE PROCEDURE documents_search_trigger();\"\n    );\n  },\n};\n\"use strict\";\n\nmodule.exports = {\n  up: async (queryInterface) => {\n    const searchDocument = `\n    CREATE OR REPLACE FUNCTION documents_search_trigger() RETURNS trigger AS $$\n    begin\n      new.\"searchVector\" :=\n        setweight(to_tsvector('english', coalesce(new.title, '')),'A') ||\n        setweight(to_tsvector('english', coalesce(array_to_string(new.\"previousTitles\", ' , '),'')),'C') ||\n        setweight(to_tsvector('english', substring(coalesce(new.text, ''), 1, 1000000)), 'D');\n      return new;\n    end\n    $$ LANGUAGE plpgsql;\n        `;\n    await queryInterface.sequelize.query(searchDocument);\n  },\n  down: async (queryInterface) => {\n    const searchDocument = `\n    CREATE OR REPLACE FUNCTION documents_search_trigger() RETURNS trigger AS $$\n    begin\n      new.\"searchVector\" :=\n        setweight(to_tsvector('english', coalesce(new.title, '')),'A') ||\n        setweight(to_tsvector('english', coalesce(array_to_string(new.\"previousTitles\", ' , '),'')),'C') ||\n        setweight(to_tsvector('english', substring(coalesce(new.text, ''), 1, 1000000)), 'B');\n      return new;\n    end\n    $$ LANGUAGE plpgsql;\n        `;\n    await queryInterface.sequelize.query(searchDocument);\n  },\n};\n20260818120000-add-deletedById-to-documents.js\n20260821164024-add-preferences-to-documents.js\n20260902125149-limit-document-search-trigger-columns.js\n20260903145856-add-document-createdbyid-index.js\n20260917003126-add-deprecated-reason-to-documents-and-collections.js\nserver/env.ts:741:    1000000;\nserver/env.ts:752:    1000000;\nserver/env.ts:769:    1000000;\nserver/utils/VerificationCode.ts:45:    return randomInt(0, 1000000).toString().padStart(6, \"0\");\nserver/storage/redis.ts:145:       local score = math.max(tonumber(now[1]) * 1000000 + tonumber(now[2]),\nserver/storage/files/BaseStorage.test.ts:138:        1000000,\nserver/queues/tasks/base/CronTask.test.ts:280:        partitionCount: 16, // 16 partitions = 0x10000000 per partition\nserver/queues/tasks/base/CronTask.test.ts:283:      // Partition 1 should be from 0x10000000 to 0x1fffffff\nserver/queues/tasks/base/CronTask.test.ts:284:      expect(where.id[Op.gte]).toBe(\"10000000-0000-4000-8000-000000000000\");\nserver/queues/tasks/base/CronTask.ts:137:    const TOTAL_VALUES = 0x100000000;"
+ },
+ {
+  "role": "tool_call",
+  "name": "Bash",
+  "content": "{\n  \"command\": \"cd /private/tmp/razor-ab/runs/outline-opus/o2-outline-tsvector-limit_rep1_1792426187231/naive; cat server/migrations/20260917003126-add-deprecated-reason-to-documents-and-collections.js | head -20; ls server/test; grep -n \\\"test\\\\b\\\\|\\\\\\\"test\\\\|db:\\\" package.json; cat .env.test 2>/dev/null | head; ls server/models/Document*; grep -rn \\\"searchVector\\\" server/models | head\"\n}"
+ },
+ {
+  "role": "tool_result",
+  "content": "module.exports = {\n  up: async (queryInterface, Sequelize) => {\n    await queryInterface.sequelize.transaction(async (transaction) => {\n      for (const table of [\"documents\", \"collections\"]) {\n        await queryInterface.addColumn(\n          table,\n          \"deprecatedReason\",\n          { type: Sequelize.TEXT, allowNull: true },\n          { transaction }\n        );\n      }\n    });\n  },\n  down: async (queryInterface) => {\n    await queryInterface.sequelize.transaction(async (transaction) => {\n      for (const table of [\"collections\", \"documents\"]) {\n        await queryInterface.removeColumn(table, \"deprecatedReason\", {\n          transaction,\n        });\n      }\nMcpHelper.ts\nTestServer.ts\nfactories.ts\nfixtures\nglobalTeardown.ts\nmsw.ts\nsetup.ts\nsetupMocks.ts\nsupport.ts\n14:    \"dev:backend\": \"NODE_ENV=development nodemon --quiet --exec \\\"yarn build:server && yarn dev\\\" -e js,ts,tsx --watch server --watch shared --watch plugins --watch .env --watch .env.local --watch .env.development --ignore \\\"shared/components/**/*.tsx?\\\" --ignore \\\"plugins/client/**/*.tsx?\\\" --ignore \\\"**/*.test.ts\\\" --ignore data/ --ignore build/ --ignore app/ --ignore \\\"shared/editor/**\\\" --ignore server/migrations\",\n24:    \"heroku-postbuild\": \"yarn build && yarn db:migrate\",\n25:    \"db:create-migration\": \"sequelize migration:create\",\n26:    \"db:create\": \"sequelize db:create\",\n27:    \"db:migrate\": \"sequelize db:migrate\",\n28:    \"db:rollback\": \"sequelize db:migrate:undo\",\n29:    \"db:reset\": \"sequelize db:drop && sequelize db:create && sequelize db:migrate\",\n31:    \"test\": \"TZ=UTC vitest run\",\n32:    \"test:app\": \"TZ=UTC vitest run --project app\",\n33:    \"test:shared\": \"TZ=UTC vitest run --project shared-node --project shared-jsdom\",\n34:    \"test:server\": \"TZ=UTC vitest run --project \\\"server*\\\"\",\n35:    \"test:watch\": \"TZ=UTC vitest\",\n349:    \"@vitest/ui\": \"^4.1.11\",\n371:    \"vitest\": \"^4.1.11\"\nNODE_ENV=test\nDATABASE_URL=postgres://user:pass@127.0.0.1:55501/outline-test\nSECRET_KEY=F0E5AD933D7F6FD8F4DBB3E038C501C052DC0593C686D21ACB30AE205D2F634B\n\nSMTP_HOST=smtp.example.com\nSMTP_USERNAME=test\nSMTP_FROM_EMAIL=hello@example.com\nSMTP_REPLY_EMAIL=hello@example.com\n\nGOOGLE_CLIENT_ID=123\nserver/models/Document.test.ts\nserver/models/Document.ts\nserver/models/DocumentInsight.test.ts\nserver/models/DocumentInsight.ts"
+ },
+ {
+  "role": "tool_call",
+  "name": "Bash",
+  "content": "{\n  \"command\": \"cd /private/tmp/razor-ab/runs/outline-opus/o2-outline-tsvector-limit_rep1_1792426187231/naive; (pg_isready -h 127.0.0.1 -p 55501; psql postgres://user:pass@127.0.0.1:55501/outline-test -c \\\"select version()\\\"; ) 2>&1 | head; npx sequelize db:migrate:status --env test 2>&1 | tail -3; cat .sequelizerc 2>/dev/null\"\n}"
+ },
+ {
+  "role": "tool_result",
+  "content": "127.0.0.1:55501 - accepting connections\n                                                          version                                                           \n----------------------------------------------------------------------------------------------------------------------------\n PostgreSQL 16.15 (Debian 16.15-1.pgdg13+2) on aarch64-unknown-linux-gnu, compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit\n(1 row)\n\n\nERROR: database \"sungjoonpark\" does not exist\n\nrequire(\"@dotenvx/dotenvx\").config({\n  path: process.env.NODE_ENV === \"test\" ? \".env.test\" : \".env\",\n});\n\nvar path = require('path');\n\nmodule.exports = {\n  'config': path.resolve('server/config', 'database.js'),\n  'migrations-path': path.resolve('server', 'migrations'),\n  'models-path': path.resolve('server', 'models'),\n}"
+ },
+ {
+  "role": "assistant",
+  "content": "Test Postgres is up. Next I'll check whether the test DB is migrated, then write a migration with a fallback trigger."
+ },
+ {
+  "role": "tool_call",
+  "name": "Bash",
+  "content": "{\n  \"command\": \"cd /private/tmp/razor-ab/runs/outline-opus/o2-outline-tsvector-limit_rep1_1792426187231/naive; NODE_ENV=test npx sequelize db:migrate:status 2>&1 | tail -3\"\n}"
+ },
+ {
+  "role": "tool_result",
+  "content": "up 20260902125149-limit-document-search-trigger-columns.js\nup 20260903145856-add-document-createdbyid-index.js\nup 20260917003126-add-deprecated-reason-to-documents-and-collections.js"
+ },
+ {
+  "role": "tool_call",
+  "name": "Bash",
+  "content": "{\n  \"command\": \"cd /private/tmp/razor-ab/runs/outline-opus/o2-outline-tsvector-limit_rep1_1792426187231/naive; psql postgres://user:pass@127.0.0.1:55501/outline-test -c \\\"\\\\set VERBOSITY verbose\\\" -c \\\"select length(to_tsvector('english', string_agg(md5(i::text), ' '))::text) from generate_series(1,30000) i\\\" 2>&1; psql postgres://user:pass@127.0.0.1:55501/outline-test -c \\\"\\\\sf documents_search_trigger\\\"\"\n}"
+ },
+ {
+  "role": "tool_result",
+  "content": "ERROR:  54000: string is too long for tsvector (1088564 bytes, max 1048575 bytes)\nLOCATION:  make_tsvector, to_tsany.c:205\nCREATE OR REPLACE FUNCTION public.documents_search_trigger()\n RETURNS trigger\n LANGUAGE plpgsql\nAS $function$\n    begin\n      new.\"searchVector\" :=\n        setweight(to_tsvector('english', coalesce(new.title, '')),'A') ||\n        setweight(to_tsvector('english', coalesce(array_to_string(new.\"previousTitles\", ' , '),'')),'C') ||\n        setweight(to_tsvector('english', substring(coalesce(new.text, ''), 1, 1000000)), 'D');\n      return new;\n    end\n    $function$"
+ },
+ {
+  "role": "tool_call",
+  "name": "Write",
+  "content": "{\n  \"file_path\": \"/private/tmp/razor-ab/runs/outline-opus/o2-outline-tsvector-limit_rep1_1792426187231/naive/server/migrations/20261019120000-handle-oversized-document-search-vector.js\",\n  \"content\": \"\\\"use strict\\\";\\n\\n/** @type {import('sequelize-cli').Migration} */\\nmodule.exports = {\\n  async up(queryInterface) {\\n    // Postgres limits the size of a tsvector (~1MB) rather than its input, so\\n    // text made up of mostly unique tokens can overflow even when truncated to\\n    // 1,000,000 characters. When that happens, fall back to a binary search for\\n    // the longest prefix of the text that still fits, keeping the title and\\n    // previous titles fully indexed.\\n    await queryInterface.sequelize.query(`\\n    CREATE OR REPLACE FUNCTION documents_search_trigger() RETURNS trigger AS $$\\n    declare\\n      \\\"titleVector\\\" tsvector;\\n      \\\"body\\\" text;\\n      \\\"lo\\\" integer;\\n      \\\"hi\\\" integer;\\n      \\\"mid\\\" integer;\\n    begin\\n      \\\"titleVector\\\" :=\\n        setweight(to_tsvector('english', coalesce(new.title, '')),'A') ||\\n        setweight(to_tsvector('english', coalesce(array_to_string(new.\\\"previousTitles\\\", ' , '),'')),'C');\\n      \\\"body\\\" := substring(coalesce(new.text, ''), 1, 1000000);\\n\\n      begin\\n        new.\\\"searchVector\\\" :=\\n          \\\"titleVector\\\" ||\\n          setweight(to_tsvector('english', \\\"body\\\"), 'D');\\n        return new;\\n      exception when program_limit_exceeded then\\n        -- fall through to indexing a prefix of the text\\n      end;\\n\\n      -- invariant: a prefix of length \\\"lo\\\" fits, a prefix of length \\\"hi\\\" does not\\n      new.\\\"searchVector\\\" := \\\"titleVector\\\";\\n      \\\"lo\\\" := 0;\\n      \\\"hi\\\" := length(\\\"body\\\");\\n\\n      while \\\"hi\\\" - \\\"lo\\\" > greatest(1000, \\\"hi\\\" / 100) loop\\n        \\\"mid\\\" := (\\\"lo\\\" + \\\"hi\\\") / 2;\\n        begin\\n          new.\\\"searchVector\\\" :=\\n            \\\"titleVector\\\" ||\\n            setweight(to_tsvector('english', substring(\\\"body\\\", 1, \\\"mid\\\")), 'D');\\n          \\\"lo\\\" := \\\"mid\\\";\\n        exception when program_limit_exceeded then\\n          \\\"hi\\\" := \\\"mid\\\";\\n        end;\\n      end loop;\\n\\n      return new;\\n    end\\n    $$ LANGUAGE plpgsql;\\n    `);\\n  },\\n\\n  async down(queryInterface) {\\n    await queryInterface.sequelize.query(`\\n    CREATE OR REPLACE FUNCTION documents_search_trigger() RETURNS trigger AS $$\\n    begin\\n      new.\\\"searchVector\\\" :=\\n        setweight(to_tsvector('english', coalesce(new.title, '')),'A') ||\\n        setweight(to_tsvector('english', coalesce(array_to_string(new.\\\"previousTitles\\\", ' , '),'')),'C') ||\\n        setweight(to_tsvector('english', substring(coalesce(new.text, ''), 1, 1000000)), 'D');\\n      return new;\\n    end\\n    $$ LANGUAGE plpgsql;\\n    `);\\n  },\\n};\\n\"\n}"
+ },
+ {
+  "role": "tool_result",
+  "content": "File created successfully at: /private/tmp/razor-ab/runs/outline-opus/o2-outline-tsvector-limit_rep1_1792426187231/naive/server/migrations/20261019120000-handle-oversized-document-search-vector.js (file state is current in your context — no need to Read it back)"
+ },
+ {
+  "role": "tool_call",
+  "name": "Bash",
+  "content": "{\n  \"command\": \"cd /private/tmp/razor-ab/runs/outline-opus/o2-outline-tsvector-limit_rep1_1792426187231/naive; psql postgres://user:pass@127.0.0.1:55501/outline-test -c \\\"\\\\set VERBOSITY verbose\\\" -c \\\"select length((to_tsvector('english', string_agg(md5(i::text), ' ') filter (where i<=16000)) || to_tsvector('english', string_agg(md5(i::text), ' ') filter (where i>16000)))::text) from generate_series(1,30000) i\\\" 2>&1; NODE_ENV=test npx sequelize db:migrate 2>&1 | tail -2\"\n}"
+ },
+ {
+  "role": "tool_result",
+  "content": "ERROR:  54000: string is too long for tsvector (1086598 bytes, max 1048575 bytes)\nLOCATION:  tsvector_concat, tsvector_op.c:1128\n== 20261019120000-handle-oversized-document-search-vector: migrated (0.008s)"
+ },
+ {
+  "role": "assistant",
+  "content": "Concat also raises 54000, so it's caught. Now tests — let me look at the existing Document model tests."
+ },
+ {
+  "role": "tool_call",
+  "name": "Bash",
+  "content": "{\n  \"command\": \"cd /private/tmp/razor-ab/runs/outline-opus/o2-outline-tsvector-limit_rep1_1792426187231/naive; head -30 server/models/Document.test.ts; grep -n \\\"^describe\\\\|^  describe\\\" server/models/Document.test.ts; grep -rn \\\"searchVector\\\" server --include=*.test.ts | head\"\n}"
+ },
+ {
+  "role": "tool_result",
+  "content": "import { EmptyResultError, Op } from \"sequelize\";\nimport { CollectionPermission, DocumentPermission } from \"@shared/types\";\nimport slugify from \"@shared/utils/slugify\";\nimport { parser } from \"@server/editor\";\nimport Document from \"@server/models/Document\";\nimport {\n  buildDocument,\n  buildDraftDocument,\n  buildCollection,\n  buildComment,\n  buildResolvedComment,\n  buildGroup,\n  buildTeam,\n  buildUser,\n  buildGuestUser,\n} from \"@server/test/factories\";\nimport { withAPIContext } from \"@server/test/support\";\nimport { sequelize } from \"@server/storage/database\";\nimport GroupMembership from \"./GroupMembership\";\nimport GroupUser from \"./GroupUser\";\nimport UserMembership from \"./UserMembership\";\n\nbeforeEach(() => {\n  vi.resetAllMocks();\n});\n\ndescribe(\"#restoreTo\", () => {\n  it.each([\"archived\", \"deleted\"])(\n    \"should clear a reason saved after an %s document was loaded\",\n    async (status) => {\n27:describe(\"#restoreTo\", () => {\n59:describe(\"#getSummary\", () => {\n81:describe(\"#destroyWithCtx\", () => {\n145:describe(\"#save\", () => {\n170:describe(\"#findAllChildDocumentIds\", () => {\n296:describe(\"#findAllParentDocumentIds\", () => {\n353:describe(\"#membershipDocumentIds\", () => {\n588:describe(\"#findByPk\", () => {\n692:describe(\"findByIds\", () => {\n813:describe(\"tasks\", () => {\n870:describe(\"commentCount\", () => {\n(eval):1: no matches found: --include=*.test.ts"
+ },
+ {
+  "role": "tool_call",
+  "name": "Bash",
+  "content": "{\n  \"command\": \"cd /private/tmp/razor-ab/runs/outline-opus/o2-outline-tsvector-limit_rep1_1792426187231/naive; sed -n 140,170p server/models/Document.test.ts; grep -n \\\"searchVector\\\\|previousTitles\\\" server/models/Document.ts | head\"\n}"
+ },
+ {
+  "role": "tool_result",
+  "content": "    expect(deletedDocument?.lastModifiedById).toBe(user.id);\n    expect(deletedDocument?.deletedAt).toBeTruthy();\n  });\n});\n\ndescribe(\"#save\", () => {\n  test(\"should have empty previousTitles by default\", async () => {\n    const document = await buildDocument();\n    expect(document.previousTitles).toBe(null);\n  });\n\n  test(\"should include previousTitles on save\", async () => {\n    const document = await buildDocument();\n    document.title = \"test\";\n    await document.save();\n    expect(document.previousTitles.length).toBe(1);\n  });\n\n  test(\"should not duplicate previousTitles\", async () => {\n    const document = await buildDocument();\n    document.title = \"test\";\n    await document.save();\n    document.title = \"example\";\n    await document.save();\n    document.title = \"test\";\n    await document.save();\n    expect(document.previousTitles.length).toBe(3);\n  });\n});\n\ndescribe(\"#findAllChildDocumentIds\", () => {\n339:  previousTitles: string[];\n567:      if (!model.previousTitles) {\n568:        model.previousTitles = [];\n571:      model.previousTitles = uniq(model.previousTitles.concat(previousTitle));"
+ },
+ {
+  "role": "tool_call",
+  "name": "Bash",
+  "content": "{\n  \"command\": \"cd /private/tmp/razor-ab/runs/outline-opus/o2-outline-tsvector-limit_rep1_1792426187231/naive; grep -n \\\"export async function buildDocument\\\" -A50 server/test/factories.ts | grep -n \\\"text\\\\|content\\\" ; grep -n \\\"  text:\\\\|declare text\\\\|text: string\\\" server/models/Document.ts | head\"\n}"
+ },
+ {
+  "role": "tool_result",
+  "content": "31:419-  const text = overrides.text ?? \"This is the text in an example document\";\n35:423-      content: overrides.content ?? parser.parse(text)?.toJSON(),\n36:424-      text,\n66:675-    text: `![image](${attachment.redirectUrl})`,\n94:703-      contentType: \"image/png\",\n390:  text: string;"
+ },
+ {
+  "role": "tool_call",
+  "name": "Bash",
+  "content": "{\n  \"command\": \"cd /private/tmp/razor-ab/runs/outline-opus/o2-outline-tsvector-limit_rep1_1792426187231/naive; sed -n 290,310p server/models/Document.ts; grep -rn \\\"documentUpdateText\\\\|UpdateDocumentText\\\\|text = \\\" server/queues/tasks/*.ts | head\"\n}"
+ },
+ {
+  "role": "tool_result",
+  "content": "                model: GroupUser,\n                as: \"groupUsers\",\n                required: true,\n              },\n            ],\n          },\n        ],\n      },\n    ],\n  },\n}))\n@Table({ tableName: \"documents\", modelName: \"document\" })\nclass Document extends ArchivableModel<\n  InferAttributes<Document>,\n  Partial<InferCreationAttributes<Document>>\n> {\n  /** Seconds for which a user's document membership IDs are cached. */\n  static membershipDocumentIdsCacheTTL = 10;\n\n  @SimpleLength({\n    min: 10,\nserver/queues/tasks/DocumentUpdateTextTask.ts:16:    document.text = serializer.serialize(node);\nserver/queues/tasks/ExportDocumentTreeTask.ts:166:          text = inlined;\nserver/queues/tasks/ExportDocumentTreeTask.ts:185:      text = text.replace(\nserver/queues/tasks/ExportDocumentTreeTask.ts:202:          text = text.replace(\nserver/queues/tasks/ExportDocumentTreeTask.ts:221:      text = OKFHelper.frontmatter(document, origin) + text;\nserver/queues/tasks/MarkdownAPIImportTask.ts:73:  let text = markdown;\nserver/queues/tasks/MarkdownAPIImportTask.ts:87:    text = text\nserver/queues/tasks/MarkdownAPIImportTask.ts:100:      text = text.replace(\nserver/queues/tasks/MarkdownAPIImportTask.ts:106:    text = text.replace(\nserver/queues/tasks/MarkdownAPIImportTask.ts:518:    let text = rewriteInternalLinks(page.markdownText, page.path, docMap);"
+ },
+ {
+  "role": "tool_call",
+  "name": "Bash",
+  "content": "{\n  \"command\": \"cd /private/tmp/razor-ab/runs/outline-opus/o2-outline-tsvector-limit_rep1_1792426187231/naive; sed -n 380,395p server/models/Document.ts; cat server/queues/tasks/DocumentUpdateTextTask.ts; ls server/queues/tasks/DocumentUpdateTextTask*\"\n}"
+ },
+ {
+  "role": "tool_result",
+  "content": "   *\n   * @deprecated Use `content` instead, or `DocumentHelper.toMarkdown` if exporting lossy markdown.\n   * This column will be removed in a future migration.\n   */\n  @SimpleLength({\n    max: DocumentValidation.maxLength,\n    msg: `Document text content must be ${DocumentValidation.maxLength} characters or less`,\n  })\n  @Column(DataType.TEXT)\n  @SkipChangeset\n  text: string;\n\n  /** The likely language of the content, in ISO 639-1 format. */\n  @Length({ max: 2, msg: \"language must be an ISO 639-1 code\" })\n  @Column(DataType.STRING(2))\n  language: string;\nimport { Node } from \"prosemirror-model\";\nimport { schema, serializer } from \"@server/editor\";\nimport { Document } from \"@server/models\";\nimport type { DocumentEvent } from \"@server/types\";\nimport { DocumentHelper } from \"@server/models/helpers/DocumentHelper\";\nimport { BaseTask } from \"./base/BaseTask\";\n\nexport default class DocumentUpdateTextTask extends BaseTask<DocumentEvent> {\n  public async perform(event: DocumentEvent) {\n    const document = await Document.findByPk(event.documentId);\n    if (!document?.content) {\n      return;\n    }\n\n    const node = Node.fromJSON(schema, document.content);\n    document.text = serializer.serialize(node);\n\n    // Loaded lazily to keep the language-detection corpus off the startup path —\n    // only this worker task needs it.\n    const [{ franc }, { iso6393To1 }] = await Promise.all([\n      import(\"franc\"),\n      import(\"iso-639-3\"),\n    ]);\n\n    const language = franc(DocumentHelper.toPlainText(document), {\n      minLength: 50,\n    });\n    document.language = iso6393To1[language];\n\n    await document.save({ silent: true });\n  }\n}\nserver/queues/tasks/DocumentUpdateTextTask.ts"
+ },
+ {
+  "role": "tool_call",
+  "name": "Bash",
+  "content": "{\n  \"command\": \"cd /private/tmp/razor-ab/runs/outline-opus/o2-outline-tsvector-limit_rep1_1792426187231/naive; grep -rn \\\"DocumentValidation = \\\" -A12 shared/validations.ts | grep -i length\"\n}"
+ },
+ {
+  "role": "tool_result",
+  "content": "shared/validations.ts-77-  /** The maximum length of the document title */\nshared/validations.ts-78-  maxTitleLength: 100,\nshared/validations.ts-80-  /** The maximum length of the document summary */\nshared/validations.ts-81-  maxSummaryLength: 1000,\nshared/validations.ts-84-  maxStateLength: 1500 * 1024,\nshared/validations.ts-87-  maxRecommendedLength: 250000,"
+ },
+ {
+  "role": "tool_call",
+  "name": "Bash",
+  "content": "{\n  \"command\": \"cd /private/tmp/razor-ab/runs/outline-opus/o2-outline-tsvector-limit_rep1_1792426187231/naive; python3 - <<'EOF'\\np='server/models/Document.test.ts'\\ns=open(p).read()\\ns=s.replace('import { EmptyResultError, Op } from \\\"sequelize\\\";','import { createHash } from \\\"node:crypto\\\";\\\\nimport { EmptyResultError, Op, QueryTypes } from \\\"sequelize\\\";',1)\\nanchor='describe(\\\"#findAllChildDocumentIds\\\", () => {'\\nnew='''describe(\\\"searchVector\\\", () => {\\n  /**\\n   * Builds text made of unique tokens that produces a tsvector larger than\\n   * the Postgres size limit, while staying under the trigger's input cap.\\n   */\\n  const buildOversizedText = () =>\\n    [\\n      \\\"beginningmarker\\\",\\n      ...Array.from({ length: 30000 }, (_, i) =>\\n        createHash(\\\"md5\\\").update(String(i)).digest(\\\"hex\\\")\\n      ),\\n      \\\"endingmarker\\\",\\n    ].join(\\\" \\\");\\n\\n  const matches = async (documentId: string, query: string) => {\\n    const [row] = await sequelize.query<{ matches: boolean }>(\\n      `SELECT \\\"searchVector\\\" @@ to_tsquery('english', :query) AS matches FROM documents WHERE id = :documentId`,\\n      {\\n        type: QueryTypes.SELECT,\\n        replacements: { documentId, query },\\n      }\\n    );\\n    return row.matches;\\n  };\\n\\n  test(\\\"should index the full text when it fits\\\", async () => {\\n    const document = await buildDocument({\\n      title: \\\"Quarterly roadmap\\\",\\n      text: \\\"First paragraph with uniqueword at the end\\\",\\n    });\\n\\n    expect(await matches(document.id, \\\"quarterly:A\\\")).toBe(true);\\n    expect(await matches(document.id, \\\"uniqueword:D\\\")).toBe(true);\\n    expect(await matches(document.id, \\\"uniqueword:A\\\")).toBe(false);\\n  });\\n\\n  test(\\\"should index a prefix of the text when the full text is too large\\\", async () => {\\n    const text = buildOversizedText();\\n    expect(text.length).toBeLessThan(1000000);\\n\\n    const document = await buildDocument({\\n      title: \\\"Hashes\\\",\\n      text,\\n    });\\n\\n    expect(await matches(document.id, \\\"hashes:A\\\")).toBe(true);\\n    expect(await matches(document.id, \\\"beginningmarker:D\\\")).toBe(true);\\n    expect(await matches(document.id, \\\"endingmarker\\\")).toBe(false);\\n  });\\n\\n  test(\\\"should save oversized text on update and keep titles indexed\\\", async () => {\\n    const document = await buildDocument({\\n      title: \\\"Original heading\\\",\\n      text: \\\"short text\\\",\\n    });\\n    document.title = \\\"Renamed heading\\\";\\n    await document.save();\\n\\n    document.text = buildOversizedText();\\n    await expect(document.save()).resolves.toBeDefined();\\n\\n    const reloaded = await Document.findByPk(document.id);\\n    expect(reloaded?.text).toEqual(document.text);\\n    expect(await matches(document.id, \\\"renamed:A\\\")).toBe(true);\\n    expect(await matches(document.id, \\\"original:C\\\")).toBe(true);\\n    expect(await matches(document.id, \\\"beginningmarker:D\\\")).toBe(true);\\n    expect(await matches(document.id, \\\"short\\\")).toBe(false);\\n  });\\n});\\n\\n'''\\ns=s.replace(anchor,new+anchor,1)\\nopen(p,'w').write(s)\\nEOF\\nyarn test server/models/Document.test.ts 2>&1 | tail -20\"\n}"
+ },
+ {
+  "role": "tool_result",
+  "content": " RUN  v4.1.11 /private/tmp/razor-ab/runs/outline-opus/o2-outline-tsvector-limit_rep1_1792426187231/naive\n\n(node:45566) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.\n(Use `node --trace-warnings ...` to show where the warning was created)\n\n Test Files  1 passed (1)\n      Tests  56 passed (56)\n   Start at  16:12:46\n   Duration  10.01s (transform 3.64s, setup 5.60s, import 1.15s, tests 3.15s, environment 0ms)\n\nSourcemap for \"/private/tmp/razor-ab/runs/outline-opus/o2-outline-tsvector-limit_rep1_1792426187231/naive/node_modules/prosemirror-codemark/dist/esm/index.js\" points to missing source files\nSourcemap for \"/private/tmp/razor-ab/runs/outline-opus/o2-outline-tsvector-limit_rep1_1792426187231/naive/node_modules/prosemirror-codemark/dist/esm/plugin.js\" points to missing source files\nSourcemap for \"/private/tmp/razor-ab/runs/outline-opus/o2-outline-tsvector-limit_rep1_1792426187231/naive/node_modules/prosemirror-codemark/dist/esm/utils.js\" points to missing source files\nSourcemap for \"/private/tmp/razor-ab/runs/outline-opus/o2-outline-tsvector-limit_rep1_1792426187231/naive/node_modules/prosemirror-codemark/dist/esm/inputRules.js\" points to missing source files\nSourcemap for \"/private/tmp/razor-ab/runs/outline-opus/o2-outline-tsvector-limit_rep1_1792426187231/naive/node_modules/prosemirror-codemark/dist/esm/actions.js\" points to missing source files\n(node:45555) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.\n(Use `node --trace-warnings ...` to show where the warning was created)"
+ },
+ {
+  "role": "assistant",
+  "content": "The tests pass. Next I'll roll the migration back to confirm the new tests fail without the fix."
+ },
+ {
+  "role": "tool_call",
+  "name": "Bash",
+  "content": "{\n  \"command\": \"cd /private/tmp/razor-ab/runs/outline-opus/o2-outline-tsvector-limit_rep1_1792426187231/naive; NODE_ENV=test npx sequelize db:migrate:undo 2>&1 | tail -1; yarn test server/models/Document.test.ts -t searchVector 2>&1 | grep -E \\\"✓|×|FAIL|Tests|too long\\\" | head; NODE_ENV=test npx sequelize db:migrate 2>&1 | tail -1\"\n}"
+ },
+ {
+  "role": "tool_result",
+  "content": "string is too long for tsvector (1088596 bytes, max 1048575 bytes)\nerror: string is too long for tsvector (1088596 bytes, max 1048575 bytes)\nstring is too long for tsvector (1088596 bytes, max 1048575 bytes)\nerror: string is too long for tsvector (1088596 bytes, max 1048575 bytes)\n     × should index a prefix of the text when the full text is too large 158ms\n     × should save oversized text on update and keep titles indexed 112ms\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯\n FAIL  |server-shared| server/models/Document.test.ts > searchVector > should index a prefix of the text when the full text is too large\nSequelizeDatabaseError: string is too long for tsvector (1088596 bytes, max 1048575 bytes)\n FAIL  |server-shared| server/models/Document.test.ts > searchVector > should save oversized text on update and keep titles indexed"
+ },
+ {
+  "role": "assistant",
+  "content": "Without the fix, both new tests fail with the reported error. Re-applying the migration and running the related search tests:"
+ },
+ {
+  "role": "tool_call",
+  "name": "Bash",
+  "content": "{\n  \"command\": \"cd /private/tmp/razor-ab/runs/outline-opus/o2-outline-tsvector-limit_rep1_1792426187231/naive; NODE_ENV=test npx sequelize db:migrate 2>&1 | tail -1; NODE_ENV=test npx sequelize db:migrate:status 2>&1 | tail -1; ls server/models/helpers/*Search* server/utils/*Search* server/queues/tasks/DocumentUpdateText* 2>/dev/null\"\n}"
+ },
+ {
+  "role": "tool_result",
+  "content": "[error] Exit code 1\nNo migrations were executed, database schema was already up to date.\nup 20261019120000-handle-oversized-document-search-vector.js\n(eval):1: no matches found: server/models/helpers/*Search*"
+ },
+ {
+  "role": "tool_call",
+  "name": "Bash",
+  "content": "{\n  \"command\": \"cd /private/tmp/razor-ab/runs/outline-opus/o2-outline-tsvector-limit_rep1_1792426187231/naive; F=$(grep -rl \\\"searchVector\\\\|SearchHelper\\\\|searchForTeam\\\" server plugins --include=\\\"*.test.ts\\\" 2>/dev/null; find server plugins -name \\\"*earch*.test.ts\\\"); echo $F; yarn test server/models/Document.test.ts $(echo $F | tr ' ' '\\\\n' | sort -u) 2>&1 | grep -E \\\"Test Files|Tests |FAIL\\\"\"\n}"
+ },
+ {
+  "role": "tool_result",
+  "content": "server/models/Document.test.ts\nplugins/search-postgres/server/PostgresSearchProvider.test.ts\nserver/models/SearchQuery.test.ts\nserver/queues/tasks/CleanupOldSearchQueriesTask.test.ts\nserver/queues/processors/SearchIndexProcessor.test.ts\nplugins/search-postgres/server/PostgresSearchProvider.test.ts\nserver/routes/api/searches/searches.test.ts\n Test Files  6 passed (6)\n      Tests  134 passed (134)"
+ },
+ {
+  "role": "tool_call",
+  "name": "Bash",
+  "content": "{\n  \"command\": \"cd /private/tmp/razor-ab/runs/outline-opus/o2-outline-tsvector-limit_rep1_1792426187231/naive; npx oxfmt --check server/models/Document.test.ts server/migrations/20261019120000-handle-oversized-document-search-vector.js 2>&1 | tail -3; npx oxlint server/models/Document.test.ts 2>&1 | tail -2\"\n}"
+ },
+ {
+  "role": "tool_result",
+  "content": "All matched files use the correct format.\nFinished in 3ms on 2 files using 8 threads."
+ },
+ {
+  "role": "tool_call",
+  "name": "Bash",
+  "content": "{\n  \"command\": \"cd /private/tmp/razor-ab/runs/outline-opus/o2-outline-tsvector-limit_rep1_1792426187231/naive; timeout 500 yarn tsc 2>&1 | tail -5\",\n  \"timeout\": 520000\n}"
+ },
+ {
+  "role": "tool_result",
+  "content": "(eval):1: command not found: timeout"
+ },
+ {
+  "role": "tool_call",
+  "name": "Bash",
+  "content": "{\n  \"command\": \"cd /private/tmp/razor-ab/runs/outline-opus/o2-outline-tsvector-limit_rep1_1792426187231/naive; yarn tsc 2>&1 | tail -5\",\n  \"timeout\": 600000\n}"
+ },
+ {
+  "role": "tool_result",
+  "content": "(Bash completed with no output)"
+ },
+ {
+  "role": "assistant",
+  "content": "Documents whose text produces too large a search vector now save normally. In that case only as much of the beginning of the text as fits gets indexed. The new tests and the existing related tests pass.\n\n**The fix** is a new migration, `server/migrations/20261019120000-handle-oversized-document-search-vector.js`, that redefines `documents_search_trigger()`:\n- The title (weight A) and previous titles (weight C) are always indexed in full, as before.\n- It first tries the text up to the existing 1,000,000-character cap, exactly as today. When that fits, the search vector is the same as before.\n- If Postgres rejects it with \"string is too long for tsvector\", the trigger catches that error and narrows down to a prefix of the text that fits. That prefix is indexed at weight D, so the save succeeds.\n- The size error can also come from joining the title, previous titles and text together, not just from processing the text. I checked that this raises the same error code, so it's caught too.\n- `down` restores the previous trigger function.\n\n**Trade-offs:**\n- The prefix search stops once it's within about 1% of the true limit, so it may index slightly less text than would fit.\n- The cut can land mid-word, so the last indexed token may be a fragment.\n- Saving an oversized document is slower, because Postgres processes the text several times while narrowing down. Normal documents take one try; the only extra cost is a lightweight error-handling block.\n\n**Tests** are in `server/models/Document.test.ts`, under a new `searchVector` block. The test text is about 30,000 MD5 hashes, which stays under the 1M-character cap but makes Postgres fail:\n- **Normal document:** the title is indexed at weight A and the text at weight D.\n- **Oversized document on create:** the save succeeds, the title and the start of the text are indexed, and a word at the end isn't.\n- **Oversized document on update:** this is the path the text-refresh worker uses. The save succeeds, the text is stored, the current title is indexed at A and the old title at C, and the stale text is gone from the index.\n\n**Verification:**\n- With the migration rolled back, both oversized-document tests fail with the \"string is too long for tsvector\" error; with it applied, they pass.\n- `Document.test.ts` plus the search tests (`PostgresSearchProvider`, `SearchIndexProcessor`, `SearchQuery`, the searches API, `CleanupOldSearchQueriesTask`): 134 tests, all passing.\n- `yarn tsc`, oxfmt and oxlint are clean.\n\nThe migration only changes how future saves are indexed. Documents that are already stale will be indexed when they're next saved, for example when the retrying worker task next runs."
+ },
+ {
+  "role": "assistant",
+  "content": "[result: success] Documents whose text produces too large a search vector now save normally. In that case only as much of the beginning of the text as fits gets indexed. The new tests and the existing related tests pass.\n\n**The fix** is a new migration, `server/migrations/20261019120000-handle-oversized-document-search-vector.js`, that redefines `documents_search_trigger()`:\n- The title (weight A) and previous titles (weight C) are always indexed in full, as before.\n- It first tries the text up to the existing 1,000,000-character cap, exactly as today. When that fits, the search vector is the same as before.\n- If Postgres rejects it with \"string is too long for tsvector\", the trigger catches that error and narrows down to a prefix of the text that fits. That prefix is indexed at weight D, so the save succeeds.\n- The size error can also come from joining the title, previous titles and text together, not just from processing the text. I checked that this raises the same error code, so it's caught too.\n- `down` restores the previous trigger function.\n\n**Trade-offs:**\n- The prefix search stops once it's within about 1% of the true limit, so it may index slightly less text than would fit.\n- The cut can land mid-word, so the last indexed token may be a fragment.\n- Saving an oversized document is slower, because Postgres processes the text several times while narrowing down. Normal documents take one try; the only extra cost is a lightweight error-handling block.\n\n**Tests** are in `server/models/Document.test.ts`, under a new `searchVector` block. The test text is about 30,000 MD5 hashes, which stays under the 1M-character cap but makes Postgres fail:\n- **Normal document:** the title is indexed at weight A and the text at weight D.\n- **Oversized document on create:** the save succeeds, the title and the start of the text are indexed, and a word at the end isn't.\n- **Oversized document on update:** this is the path the text-refresh worker uses. The save succeeds, the text is stored, the current title is indexed at A and the old title at C, and the stale text is gone from the index.\n\n**Verification:**\n- With the migration rolled back, both oversized-document tests fail with the \"string is too long for tsvector\" error; with it applied, they pass.\n- `Document.test.ts` plus the search tests (`PostgresSearchProvider`, `SearchIndexProcessor`, `SearchQuery`, the searches API, `CleanupOldSearchQueriesTask`): 134 tests, all passing.\n- `yarn tsc`, oxfmt and oxlint are clean.\n\nThe migration only changes how future saves are indexed. Documents that are already stale will be indexed when they're next saved, for example when the retrying worker task next runs."
+ }
+]

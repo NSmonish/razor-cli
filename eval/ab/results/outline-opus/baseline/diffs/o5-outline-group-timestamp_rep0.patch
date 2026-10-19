@@ -1,0 +1,354 @@
+diff --git a/server/commands/groupsSyncer.test.ts b/server/commands/groupsSyncer.test.ts
+index 59abb23..aeb9fd7 100644
+--- a/server/commands/groupsSyncer.test.ts
++++ b/server/commands/groupsSyncer.test.ts
+@@ -103,6 +103,12 @@ describe("groupsSyncer", () => {
+       })
+     );
+ 
++    const past = new Date("2020-01-01T00:00:00.000Z");
++    await sequelize.query(
++      `UPDATE groups SET "updatedAt" = :past WHERE "teamId" = :teamId`,
++      { replacements: { past, teamId: user.teamId } }
++    );
++
+     // Second sync with only one group
+     const result = await sequelize.transaction(async (transaction) =>
+       groupsSyncer(createContext({ user, transaction, ip }), {
+@@ -118,6 +124,7 @@ describe("groupsSyncer", () => {
+     const designGroup = await Group.findOne({
+       where: { teamId: user.teamId, name: "Design" },
+     });
++    expect(designGroup!.updatedAt.getTime()).toBeGreaterThan(past.getTime());
+     const membership = await GroupUser.findOne({
+       where: { groupId: designGroup!.id, userId: user.id },
+     });
+diff --git a/server/models/GroupUser.test.ts b/server/models/GroupUser.test.ts
+new file mode 100644
+index 0000000..adf1e8d
+--- /dev/null
++++ b/server/models/GroupUser.test.ts
+@@ -0,0 +1,79 @@
++import { Group, GroupUser } from "@server/models";
++import { sequelize } from "@server/storage/database";
++import { buildGroup, buildGroupUser, buildUser } from "@server/test/factories";
++
++const past = new Date("2020-01-01T00:00:00.000Z");
++
++async function setGroupUpdatedAt(groupId: string, date: Date) {
++  await sequelize.query(
++    `UPDATE groups SET "updatedAt" = :date WHERE id = :id`,
++    {
++      replacements: { date, id: groupId },
++    }
++  );
++}
++
++async function getGroupUpdatedAt(groupId: string) {
++  const group = await Group.findByPk(groupId, { rejectOnEmpty: true });
++  return group.updatedAt;
++}
++
++describe("GroupUser", () => {
++  describe("hooks", () => {
++    it("should move group updatedAt forward when a member is added", async () => {
++      const user = await buildUser();
++      const group = await buildGroup({ teamId: user.teamId });
++      await setGroupUpdatedAt(group.id, past);
++
++      await GroupUser.create({
++        groupId: group.id,
++        userId: user.id,
++        createdById: user.id,
++      });
++
++      expect((await getGroupUpdatedAt(group.id)).getTime()).toBeGreaterThan(
++        past.getTime()
++      );
++    });
++
++    it("should move group updatedAt forward when a member is removed", async () => {
++      const user = await buildUser();
++      const group = await buildGroup({ teamId: user.teamId });
++      const groupUser = await buildGroupUser({
++        groupId: group.id,
++        userId: user.id,
++        teamId: user.teamId,
++      });
++      await setGroupUpdatedAt(group.id, past);
++
++      await groupUser.destroy();
++
++      expect((await getGroupUpdatedAt(group.id)).getTime()).toBeGreaterThan(
++        past.getTime()
++      );
++    });
++
++    it("should move group updatedAt forward within a transaction", async () => {
++      const user = await buildUser();
++      const group = await buildGroup({ teamId: user.teamId });
++      await buildGroupUser({
++        groupId: group.id,
++        userId: user.id,
++        teamId: user.teamId,
++      });
++      await setGroupUpdatedAt(group.id, past);
++
++      await sequelize.transaction(async (transaction) => {
++        await GroupUser.destroy({
++          where: { userId: user.id },
++          transaction,
++          individualHooks: true,
++        });
++      });
++
++      expect((await getGroupUpdatedAt(group.id)).getTime()).toBeGreaterThan(
++        past.getTime()
++      );
++    });
++  });
++});
+diff --git a/server/models/GroupUser.ts b/server/models/GroupUser.ts
+index fff0277..aa49fe1 100644
+--- a/server/models/GroupUser.ts
++++ b/server/models/GroupUser.ts
+@@ -1,4 +1,8 @@
+-import type { InferAttributes, InferCreationAttributes } from "sequelize";
++import type {
++  InferAttributes,
++  InferCreationAttributes,
++  Transaction,
++} from "sequelize";
+ import {
+   AfterCreate,
+   AfterDestroy,
+@@ -77,6 +81,44 @@ class GroupUser extends Model<
+   static async invalidateDocumentIdsAfterDestroy(model: GroupUser) {
+     await Document.invalidateMembershipDocumentIds([model.userId]);
+   }
++
++  @AfterCreate
++  static async touchGroupAfterCreate(
++    model: GroupUser,
++    options: { transaction?: Transaction | null }
++  ) {
++    await GroupUser.touchGroup(model.groupId, options.transaction);
++  }
++
++  @AfterDestroy
++  static async touchGroupAfterDestroy(
++    model: GroupUser,
++    options: { transaction?: Transaction | null }
++  ) {
++    await GroupUser.touchGroup(model.groupId, options.transaction);
++  }
++
++  /**
++   * Moves the group's updatedAt forward so that clients can detect that its
++   * membership has changed.
++   *
++   * @param groupId The id of the group to touch.
++   * @param transaction The transaction to run the update in, if any.
++   */
++  private static async touchGroup(
++    groupId: string,
++    transaction?: Transaction | null
++  ) {
++    const group = await Group.findByPk(groupId, { transaction });
++    if (!group) {
++      return;
++    }
++
++    // A bulk update that only sets updatedAt is skipped by Sequelize, so mark
++    // the timestamp as changed on the instance and save it instead.
++    group.changed("updatedAt", true);
++    await group.save({ transaction, hooks: false, validate: false });
++  }
+ }
+ 
+ export default GroupUser;
+diff --git a/server/queues/processors/UserDeletedProcessor.test.ts b/server/queues/processors/UserDeletedProcessor.test.ts
+index 8a6cf74..26e348f 100644
+--- a/server/queues/processors/UserDeletedProcessor.test.ts
++++ b/server/queues/processors/UserDeletedProcessor.test.ts
+@@ -1,5 +1,12 @@
+ import UserAuthentication from "@server/models/UserAuthentication";
+-import { buildUser, buildWebhookSubscription } from "@server/test/factories";
++import { Group, GroupUser } from "@server/models";
++import {
++  buildGroup,
++  buildGroupUser,
++  buildUser,
++  buildWebhookSubscription,
++} from "@server/test/factories";
++import { sequelize } from "@server/storage/database";
+ import UserDeletedProcessor from "./UserDeletedProcessor";
+ 
+ const ip = "127.0.0.1";
+@@ -33,6 +40,36 @@ describe("UserDeletedProcessor", () => {
+     ).toBe(0);
+   });
+ 
++  it("should move updatedAt forward on groups the user is removed from", async () => {
++    const user = await buildUser();
++    const group = await buildGroup({ teamId: user.teamId });
++    await buildGroupUser({
++      groupId: group.id,
++      userId: user.id,
++      teamId: user.teamId,
++    });
++    const past = new Date("2020-01-01T00:00:00.000Z");
++    await sequelize.query(
++      `UPDATE groups SET "updatedAt" = :past WHERE id = :id`,
++      {
++        replacements: { past, id: group.id },
++      }
++    );
++
++    const processor = new UserDeletedProcessor();
++    await processor.perform({
++      name: "users.delete",
++      userId: user.id,
++      actorId: user.id,
++      teamId: user.teamId,
++      ip,
++    });
++
++    expect(await GroupUser.count({ where: { userId: user.id } })).toBe(0);
++    const reloaded = await Group.findByPk(group.id, { rejectOnEmpty: true });
++    expect(reloaded.updatedAt.getTime()).toBeGreaterThan(past.getTime());
++  });
++
+   it("should disable webhook subscriptions created by the user", async () => {
+     const user = await buildUser();
+     const webhook = await buildWebhookSubscription({
+diff --git a/server/routes/api/groups/groups.test.ts b/server/routes/api/groups/groups.test.ts
+index 9689150..0c258d4 100644
+--- a/server/routes/api/groups/groups.test.ts
++++ b/server/routes/api/groups/groups.test.ts
+@@ -1,11 +1,17 @@
+ import type { Group, User } from "@server/models";
+-import { AuthenticationProvider, Event, ExternalGroup } from "@server/models";
++import {
++  AuthenticationProvider,
++  Event,
++  ExternalGroup,
++  Group as GroupModel,
++} from "@server/models";
+ import {
+   buildUser,
+   buildAdmin,
+   buildGroup,
+   buildGroupUser,
+ } from "@server/test/factories";
++import { sequelize } from "@server/storage/database";
+ import { getTestServer } from "@server/test/support";
+ import { GroupPermission } from "@shared/types";
+ 
+@@ -644,6 +650,36 @@ describe("#groups.add_user", () => {
+     expect(users.length).toEqual(1);
+   });
+ 
++  it("should move group updatedAt forward and return it", async () => {
++    const user = await buildAdmin();
++    const group = await buildGroup({
++      teamId: user.teamId,
++    });
++    const past = new Date("2020-01-01T00:00:00.000Z");
++    await sequelize.query(
++      `UPDATE groups SET "updatedAt" = :past WHERE id = :id`,
++      {
++        replacements: { past, id: group.id },
++      }
++    );
++
++    const res = await server.post("/api/groups.add_user", user, {
++      body: {
++        id: group.id,
++        userId: user.id,
++      },
++    });
++    const body = await res.json();
++    const reloaded = await GroupModel.findByPk(group.id, {
++      rejectOnEmpty: true,
++    });
++    expect(res.status).toEqual(200);
++    expect(reloaded.updatedAt.getTime()).toBeGreaterThan(past.getTime());
++    expect(body.data.groups[0].updatedAt).toEqual(
++      reloaded.updatedAt.toISOString()
++    );
++  });
++
+   it("should add user to group as admin", async () => {
+     const user = await buildAdmin();
+     const anotherUser = await buildUser({
+@@ -733,6 +769,41 @@ describe("#groups.remove_user", () => {
+     expect(users1.length).toEqual(0);
+   });
+ 
++  it("should move group updatedAt forward and return it", async () => {
++    const user = await buildAdmin();
++    const group = await buildGroup({
++      teamId: user.teamId,
++    });
++    await buildGroupUser({
++      groupId: group.id,
++      userId: user.id,
++      teamId: user.teamId,
++    });
++    const past = new Date("2020-01-01T00:00:00.000Z");
++    await sequelize.query(
++      `UPDATE groups SET "updatedAt" = :past WHERE id = :id`,
++      {
++        replacements: { past, id: group.id },
++      }
++    );
++
++    const res = await server.post("/api/groups.remove_user", user, {
++      body: {
++        id: group.id,
++        userId: user.id,
++      },
++    });
++    const body = await res.json();
++    const reloaded = await GroupModel.findByPk(group.id, {
++      rejectOnEmpty: true,
++    });
++    expect(res.status).toEqual(200);
++    expect(reloaded.updatedAt.getTime()).toBeGreaterThan(past.getTime());
++    expect(body.data.groups[0].updatedAt).toEqual(
++      reloaded.updatedAt.toISOString()
++    );
++  });
++
+   it("should require authentication", async () => {
+     const res = await server.post("/api/groups.remove_user");
+     expect(res.status).toEqual(401);
+diff --git a/server/routes/api/groups/groups.ts b/server/routes/api/groups/groups.ts
+index 6fc322f..654f3d7 100644
+--- a/server/routes/api/groups/groups.ts
++++ b/server/routes/api/groups/groups.ts
+@@ -497,6 +497,7 @@ router.post(
+     }
+ 
+     groupUser.user = user;
++    await group.reload({ transaction });
+ 
+     ctx.body = {
+       data: {
+@@ -553,6 +554,7 @@ router.post(
+     });
+ 
+     await groupUser?.destroyWithCtx(ctx, { name: "remove_user" });
++    await group.reload({ transaction });
+ 
+     ctx.body = {
+       data: {
+@@ -613,6 +615,7 @@ router.post(
+ 
+     await groupUser.updateWithCtx(ctx, { permission });
+     groupUser.user = user;
++    await group.reload({ transaction });
+ 
+     ctx.body = {
+       data: {

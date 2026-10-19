@@ -21,7 +21,7 @@ failure is #11 realworld.
 09-django    | lang=Python fw=Django test=unittest/pytest orm=Django ORM  | skills=code-push,run-tests                    | check=pytest | files=10
 10-nest      | lang=TypeScript fw=Express.js test=Vitest orm=TypeORM      | skills=code-push,lint-fix,run-tests           | check=oxlint packages integration ; vitest run | files=11
 11-realworld | lang=TypeScript fw=React test=unknown orm=unknown          | skills=build,code-push                        | check=make test | files=10   [FAIL: meta/spec repo, not a real app]
-12-node-tbp  | lang=TypeScript fw=Express.js test=Jest orm=Sequelize      | skills=code-push,lint-fix,run-tests           | check=eslint . ; jest | files=11
+12-node-tbp  | lang=TypeScript fw=Express.js test=Jest orm=Sequelize      | skills=code-push,db-migrations,lint-fix,local-env,run-tests | check=eslint . ; jest | files=14   [re-run alone after 3caa34a's nested migrations/compose detection; other rows not re-run]
 13-fastapi-bp| lang=unknown fw=unknown test=unknown orm=unknown           | skills=code-push                              | check=- | files=4   [borderline: docs-only repo, accurate but thin]
 14-prisma-ex | lang=TypeScript fw=unknown test=Vitest orm=unknown         | skills=code-push,lint-fix,run-tests           | check=vitest run | files=11   [partial: monorepo not deep-parsed]
 15-pytorch   | lang=Python fw=unknown test=unittest/pytest orm=unknown    | skills=build,code-push,lint-fix,local-env,run-tests | check=ctest --test-dir build | files=12

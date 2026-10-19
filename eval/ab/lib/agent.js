@@ -3,7 +3,7 @@
 const fs = require('fs');
 const path = require('path');
 const { spawnSync } = require('child_process');
-const { run } = require('./util');
+const { run, repoEnv } = require('./util');
 
 // first moment the workspace differs from its initial commit, whichever tool
 // made the change (Edit, Write, sed -i, a python heredoc, ...)
@@ -33,7 +33,7 @@ function agentEnv() {
   return env;
 }
 
-async function runAgent({ ws, prompt, model, effort, timeoutMs, maxBudgetUsd, extraArgs = [], traceFile }) {
+async function runAgent({ ws, repo, prompt, model, effort, timeoutMs, maxBudgetUsd, extraArgs = [], traceFile }) {
   const args = [
     '-p', prompt,
     '--output-format', 'stream-json',
@@ -57,7 +57,7 @@ async function runAgent({ ws, prompt, model, effort, timeoutMs, maxBudgetUsd, ex
 
   const res = await run('claude', args, {
     cwd: ws,
-    env: agentEnv(),
+    env: repo ? repoEnv(repo, agentEnv()) : agentEnv(),
     stdio: ['ignore', 'pipe', err],
     timeoutMs,
     onStdoutLine: (line) => {

@@ -1,0 +1,218 @@
+diff --git a/server/commands/groupsSyncer.test.ts b/server/commands/groupsSyncer.test.ts
+index b58abcd..e43155e 100644
+--- a/server/commands/groupsSyncer.test.ts
++++ b/server/commands/groupsSyncer.test.ts
+@@ -258,4 +258,105 @@ describe("groupsSyncer", () => {
+ 
+     expect(result.membershipsRemoved).toEqual(1);
+   });
++
++  it("should allow external groups with duplicate names", async () => {
++    const user = await buildUser();
++    const team = await user.$get("team")!;
++    const authenticationProvider = (await AuthenticationProvider.findOne({
++      where: { teamId: user.teamId },
++    }))!;
++    const externalGroups = [
++      { id: "ext-1", name: "Engineering" },
++      { id: "ext-2", name: "Engineering" },
++      { id: "ext-3", name: "engineering" },
++    ];
++
++    const first = await sequelize.transaction(async (transaction) =>
++      groupsSyncer(createContext({ user, transaction, ip }), {
++        user,
++        team: team!,
++        authenticationProvider,
++        externalGroups,
++      })
++    );
++    expect(first.groupsCreated).toEqual(3);
++    expect(first.membershipsAdded).toEqual(3);
++
++    const groupsBefore = await Group.findAll({
++      where: { teamId: user.teamId },
++    });
++    expect(groupsBefore.map((g) => g.externalId).sort()).toEqual([
++      "ext-1",
++      "ext-2",
++      "ext-3",
++    ]);
++
++    const second = await sequelize.transaction(async (transaction) =>
++      groupsSyncer(createContext({ user, transaction, ip }), {
++        user,
++        team: team!,
++        authenticationProvider,
++        externalGroups,
++      })
++    );
++    expect(second.groupsCreated).toEqual(0);
++    expect(second.membershipsAdded).toEqual(0);
++    expect(second.membershipsRemoved).toEqual(0);
++
++    const groupsAfter = await Group.findAll({
++      where: { teamId: user.teamId },
++    });
++    expect(groupsAfter.map((g) => g.id).sort()).toEqual(
++      groupsBefore.map((g) => g.id).sort()
++    );
++  });
++
++  it("should repair previously synced groups without an externalId", async () => {
++    const user = await buildUser();
++    const team = await user.$get("team")!;
++    const authenticationProvider = (await AuthenticationProvider.findOne({
++      where: { teamId: user.teamId },
++    }))!;
++    const externalGroups = [
++      { id: "ext-1", name: "Engineering" },
++      { id: "ext-2", name: "Engineering" },
++    ];
++
++    await sequelize.transaction(async (transaction) =>
++      groupsSyncer(createContext({ user, transaction, ip }), {
++        user,
++        team: team!,
++        authenticationProvider,
++        externalGroups,
++      })
++    );
++
++    // Simulate groups created by an earlier version that did not store the
++    // externalId on the internal group.
++    await sequelize
++      .getQueryInterface()
++      .bulkUpdate("groups", { externalId: null }, { teamId: user.teamId }, {});
++
++    const result = await sequelize.transaction(async (transaction) =>
++      groupsSyncer(createContext({ user, transaction, ip }), {
++        user,
++        team: team!,
++        authenticationProvider,
++        externalGroups: [
++          { id: "ext-1", name: "Engineering", description: "First" },
++          { id: "ext-2", name: "Engineering", description: "Second" },
++        ],
++      })
++    );
++    expect(result.groupsCreated).toEqual(0);
++
++    const groups = await Group.findAll({
++      where: { teamId: user.teamId },
++      order: [["externalId", "ASC"]],
++    });
++    expect(groups.map((g) => [g.externalId, g.description])).toEqual([
++      ["ext-1", "First"],
++      ["ext-2", "Second"],
++    ]);
++  });
+ });
+diff --git a/server/commands/groupsSyncer.ts b/server/commands/groupsSyncer.ts
+index 735a637..4a7898b 100644
+--- a/server/commands/groupsSyncer.ts
++++ b/server/commands/groupsSyncer.ts
+@@ -85,8 +85,14 @@ async function groupsSyncer(
+           transaction,
+         });
+         if (group) {
+-          const groupUpdates: Partial<{ name: string; description: string }> =
+-            {};
++          const groupUpdates: Partial<{
++            name: string;
++            description: string;
++            externalId: string;
++          }> = {};
++          if (!group.externalId) {
++            groupUpdates.externalId = eg.id;
++          }
+           if (group.name !== eg.name) {
+             groupUpdates.name = eg.name;
+           }
+@@ -108,6 +114,7 @@ async function groupsSyncer(
+       const group = await Group.createWithCtx(ctx, {
+         name: eg.name,
+         description: description ?? "",
++        externalId: eg.id,
+         teamId: team.id,
+         createdById: user.id,
+       });
+diff --git a/server/models/Group.test.ts b/server/models/Group.test.ts
+index 1cef326..53e5e29 100644
+--- a/server/models/Group.test.ts
++++ b/server/models/Group.test.ts
+@@ -171,4 +171,53 @@ describe("Group", () => {
+       expect(await group.memberCount).toEqual(2);
+     });
+   });
++
++  describe("isUniqueNameInTeam", () => {
++    it("should not allow duplicate names for groups without externalId", async () => {
++      const group = await buildGroup({ name: "Engineering" });
++      await expect(
++        buildGroup({ name: "engineering", teamId: group.teamId })
++      ).rejects.toThrow("The name of this group is already in use");
++    });
++
++    it("should allow the same name in different teams", async () => {
++      await buildGroup({ name: "Engineering" });
++      await expect(buildGroup({ name: "Engineering" })).resolves.toBeTruthy();
++    });
++
++    it("should allow duplicate names for groups with different externalIds", async () => {
++      const group = await buildGroup({
++        name: "Engineering",
++        externalId: "ext-1",
++      });
++      const other = await buildGroup({
++        name: "Engineering",
++        externalId: "ext-2",
++        teamId: group.teamId,
++      });
++      const manual = await buildGroup({
++        name: "Engineering",
++        teamId: group.teamId,
++      });
++
++      // Re-validating existing groups should continue to succeed
++      await expect(group.update({ description: "a" })).resolves.toBeTruthy();
++      await expect(other.update({ description: "b" })).resolves.toBeTruthy();
++      await expect(manual.update({ description: "c" })).resolves.toBeTruthy();
++    });
++
++    it("should not allow duplicate names for groups with the same externalId", async () => {
++      const group = await buildGroup({
++        name: "Engineering",
++        externalId: "ext-1",
++      });
++      await expect(
++        buildGroup({
++          name: "ENGINEERING",
++          externalId: "ext-1",
++          teamId: group.teamId,
++        })
++      ).rejects.toThrow("The name of this group is already in use");
++    });
++  });
+ });
+diff --git a/server/models/Group.ts b/server/models/Group.ts
+index 39856d1..1ffe3a4 100644
+--- a/server/models/Group.ts
++++ b/server/models/Group.ts
+@@ -39,12 +39,16 @@ import NotContainsUrl from "./validators/NotContainsUrl";
+   modelName: "group",
+   validate: {
+     async isUniqueNameInTeam(this: Group) {
++      // Groups synced from an external provider may legitimately share a
++      // display name, so names are only required to be unique amongst groups
++      // with the same externalId (or amongst groups without one).
+       const foundItem = await Group.findOne({
+         where: {
+           teamId: this.teamId,
+           name: {
+             [Op.iLike]: this.name,
+           },
++          externalId: this.externalId ?? null,
+           id: {
+             [Op.not]: this.id,
+           },

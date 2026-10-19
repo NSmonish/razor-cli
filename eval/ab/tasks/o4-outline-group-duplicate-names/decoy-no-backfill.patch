@@ -1,0 +1,63 @@
+diff --git a/server/commands/groupsSyncer.ts b/server/commands/groupsSyncer.ts
+index 735a637b4..14111f255 100644
+--- a/server/commands/groupsSyncer.ts
++++ b/server/commands/groupsSyncer.ts
+@@ -85,8 +85,11 @@ async function groupsSyncer(
+           transaction,
+         });
+         if (group) {
+-          const groupUpdates: Partial<{ name: string; description: string }> =
+-            {};
++          const groupUpdates: Partial<{
++            name: string;
++            description: string;
++            externalId: string;
++          }> = {};
+           if (group.name !== eg.name) {
+             groupUpdates.name = eg.name;
+           }
+@@ -108,6 +111,7 @@ async function groupsSyncer(
+       const group = await Group.createWithCtx(ctx, {
+         name: eg.name,
+         description: description ?? "",
++        externalId: eg.id,
+         teamId: team.id,
+         createdById: user.id,
+       });
+diff --git a/server/models/Group.ts b/server/models/Group.ts
+index 39856d1a7..5c27ff124 100644
+--- a/server/models/Group.ts
++++ b/server/models/Group.ts
+@@ -1,5 +1,5 @@
+ import type { InferAttributes, InferCreationAttributes } from "sequelize";
+-import { Op } from "sequelize";
++import { Op, Sequelize } from "sequelize";
+ import {
+   BelongsTo,
+   Column,
+@@ -38,16 +38,22 @@ import NotContainsUrl from "./validators/NotContainsUrl";
+   tableName: "groups",
+   modelName: "group",
+   validate: {
++    // Group names must be unique within the team, ignoring case. Groups synced
++    // from an external provider are scoped by their externalId, since providers
++    // can legitimately report several groups with the same name.
+     async isUniqueNameInTeam(this: Group) {
+       const foundItem = await Group.findOne({
++        attributes: ["id"],
+         where: {
+           teamId: this.teamId,
+-          name: {
+-            [Op.iLike]: this.name,
+-          },
++          externalId: this.externalId ?? null,
+           id: {
+             [Op.not]: this.id,
+           },
++          [Op.and]: Sequelize.where(
++            Sequelize.fn("lower", Sequelize.col("name")),
++            (this.name ?? "").toLowerCase()
++          ),
+         },
+       });
+ 

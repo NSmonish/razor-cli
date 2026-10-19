@@ -1,0 +1,266 @@
+diff --git a/server/models/Collection.test.ts b/server/models/Collection.test.ts
+index bfce911..336e4f7 100644
+--- a/server/models/Collection.test.ts
++++ b/server/models/Collection.test.ts
+@@ -1,4 +1,5 @@
+ import { randomUUID } from "node:crypto";
++import { EmptyResultError } from "sequelize";
+ import { randomString } from "@shared/random";
+ import slugify from "@shared/utils/slugify";
+ import { createContext } from "@server/context";
+@@ -603,6 +604,17 @@ describe("#findByPk", () => {
+     expect(response).toBe(null);
+   });
+ 
++  it("should reject a malformed id when rejectOnEmpty is passed", async () => {
++    await expect(
++      Collection.findByPk("invalid", { rejectOnEmpty: true })
++    ).rejects.toThrow(EmptyResultError);
++
++    const error = new Error("does not exist");
++    await expect(
++      Collection.findByPk("invalid", { rejectOnEmpty: error })
++    ).rejects.toThrow(error);
++  });
++
+   it("should return null when no collection is found with uuid", async () => {
+     const response = await Collection.findByPk(
+       "a9e71a81-7342-4ea3-9889-9b9cc8f667da"
+diff --git a/server/models/Collection.ts b/server/models/Collection.ts
+index bb0b285..13afdee 100644
+--- a/server/models/Collection.ts
++++ b/server/models/Collection.ts
+@@ -658,6 +658,7 @@ class Collection extends ParanoidModel<
+    * @param id uuid or urlId
+    * @param options FindOptions
+    * @returns A promise resolving to a collection instance or null
++   * @throws EmptyResultError if `rejectOnEmpty` is set and no collection is found.
+    */
+   static async findByPk(
+     id: Identifier,
+@@ -672,6 +673,11 @@ class Collection extends ParanoidModel<
+     options: FindOptions<Collection> & AdditionalFindOptions = {}
+   ): Promise<Collection | null> {
+     if (typeof id !== "string") {
++      if (options.rejectOnEmpty) {
++        throw options.rejectOnEmpty instanceof Error
++          ? options.rejectOnEmpty
++          : new EmptyResultError(`Collection doesn't exist with id: ${id}`);
++      }
+       return null;
+     }
+ 
+@@ -736,6 +742,12 @@ class Collection extends ParanoidModel<
+       return collection;
+     }
+ 
++    if (rest.rejectOnEmpty) {
++      throw rest.rejectOnEmpty instanceof Error
++        ? rest.rejectOnEmpty
++        : new EmptyResultError(`Collection doesn't exist with id: ${id}`);
++    }
++
+     return null;
+   }
+ 
+diff --git a/server/models/Document.test.ts b/server/models/Document.test.ts
+index d6111bf..ddac0b2 100644
+--- a/server/models/Document.test.ts
++++ b/server/models/Document.test.ts
+@@ -648,6 +648,21 @@ describe("#findByPk", () => {
+     ).rejects.toThrow(EmptyResultError);
+   });
+ 
++  it("should reject a malformed id when rejectOnEmpty is passed", async () => {
++    await expect(
++      Document.findByPk("invalid", { rejectOnEmpty: true })
++    ).rejects.toThrow(EmptyResultError);
++
++    const error = new Error("does not exist");
++    await expect(
++      Document.findByPk("invalid", { rejectOnEmpty: error })
++    ).rejects.toThrow(error);
++  });
++
++  it("should return null for a malformed id without rejectOnEmpty", async () => {
++    await expect(Document.findByPk("invalid")).resolves.toBeNull();
++  });
++
+   it("should omit content columns when includeContent is false", async () => {
+     const document = await buildDocument({ text: "# Heading" });
+ 
+diff --git a/server/models/Document.ts b/server/models/Document.ts
+index af5f7d2..7ec9e84 100644
+--- a/server/models/Document.ts
++++ b/server/models/Document.ts
+@@ -908,6 +908,7 @@ class Document extends ArchivableModel<
+    * @param id uuid or urlId
+    * @param options FindOptions
+    * @returns A promise resolving to a document instance or null
++   * @throws EmptyResultError if `rejectOnEmpty` is set and no document is found.
+    */
+   static async findByPk(
+     id: Identifier,
+@@ -923,6 +924,11 @@ class Document extends ArchivableModel<
+       AdditionalFindOptions = {}
+   ): Promise<Document | null> {
+     if (typeof id !== "string") {
++      if (options.rejectOnEmpty) {
++        throw options.rejectOnEmpty instanceof Error
++          ? options.rejectOnEmpty
++          : new EmptyResultError(`Document doesn't exist with id: ${id}`);
++      }
+       return null;
+     }
+ 
+@@ -993,6 +999,12 @@ class Document extends ArchivableModel<
+       return document;
+     }
+ 
++    if (rest.rejectOnEmpty) {
++      throw rest.rejectOnEmpty instanceof Error
++        ? rest.rejectOnEmpty
++        : new EmptyResultError(`Document doesn't exist with id: ${id}`);
++    }
++
+     return null;
+   }
+ 
+diff --git a/server/models/Template.test.ts b/server/models/Template.test.ts
+new file mode 100644
+index 0000000..167ab51
+--- /dev/null
++++ b/server/models/Template.test.ts
+@@ -0,0 +1,45 @@
++import { EmptyResultError } from "sequelize";
++import { buildTemplate } from "@server/test/factories";
++import Template from "./Template";
++
++describe("#findByPk", () => {
++  it("should return template by id and urlId", async () => {
++    const template = await buildTemplate();
++
++    const byId = await Template.findByPk(template.id);
++    expect(byId?.id).toBe(template.id);
++
++    const byUrlId = await Template.findByPk(template.urlId);
++    expect(byUrlId?.id).toBe(template.id);
++  });
++
++  it("should return null for a malformed id without rejectOnEmpty", async () => {
++    await expect(Template.findByPk("invalid")).resolves.toBeNull();
++  });
++
++  it("should reject a missing id when rejectOnEmpty is passed", async () => {
++    await expect(
++      Template.findByPk("0e8280ea-7b4c-40e5-98ba-ec8a2f00f5e8", {
++        rejectOnEmpty: true,
++      })
++    ).rejects.toThrow(EmptyResultError);
++  });
++
++  it("should reject a malformed id when rejectOnEmpty is passed", async () => {
++    await expect(
++      Template.findByPk("invalid", { rejectOnEmpty: true })
++    ).rejects.toThrow(EmptyResultError);
++  });
++
++  it("should throw the passed error when rejectOnEmpty is an error", async () => {
++    const error = new Error("does not exist");
++    await expect(
++      Template.findByPk("0e8280ea-7b4c-40e5-98ba-ec8a2f00f5e8", {
++        rejectOnEmpty: error,
++      })
++    ).rejects.toThrow(error);
++    await expect(
++      Template.findByPk("invalid", { rejectOnEmpty: error })
++    ).rejects.toThrow(error);
++  });
++});
+diff --git a/server/models/Template.ts b/server/models/Template.ts
+index 5c1091e..9e7e650 100644
+--- a/server/models/Template.ts
++++ b/server/models/Template.ts
+@@ -227,6 +227,7 @@ class Template extends ParanoidModel<
+    * @param id uuid or urlId
+    * @param options FindOptions
+    * @returns A promise resolving to a template instance or null
++   * @throws EmptyResultError if `rejectOnEmpty` is set and no template is found.
+    */
+   static async findByPk(
+     id: Identifier,
+@@ -244,6 +245,11 @@ class Template extends ParanoidModel<
+       AdditionalFindOptions = {}
+   ): Promise<Template | null> {
+     if (typeof id !== "string") {
++      if (options.rejectOnEmpty) {
++        throw options.rejectOnEmpty instanceof Error
++          ? options.rejectOnEmpty
++          : new EmptyResultError(`Template doesn't exist with id: ${id}`);
++      }
+       return null;
+     }
+ 
+@@ -268,7 +274,9 @@ class Template extends ParanoidModel<
+       });
+ 
+       if (!template && rest.rejectOnEmpty) {
+-        throw new EmptyResultError(`Template doesn't exist with id: ${id}`);
++        throw rest.rejectOnEmpty instanceof Error
++          ? rest.rejectOnEmpty
++          : new EmptyResultError(`Template doesn't exist with id: ${id}`);
+       }
+ 
+       return template;
+@@ -285,12 +293,20 @@ class Template extends ParanoidModel<
+       });
+ 
+       if (!template && rest.rejectOnEmpty) {
+-        throw new EmptyResultError(`Template doesn't exist with id: ${id}`);
++        throw rest.rejectOnEmpty instanceof Error
++          ? rest.rejectOnEmpty
++          : new EmptyResultError(`Template doesn't exist with id: ${id}`);
+       }
+ 
+       return template;
+     }
+ 
++    if (rest.rejectOnEmpty) {
++      throw rest.rejectOnEmpty instanceof Error
++        ? rest.rejectOnEmpty
++        : new EmptyResultError(`Template doesn't exist with id: ${id}`);
++    }
++
+     return null;
+   }
+ }
+diff --git a/server/routes/api/urls/urls.test.ts b/server/routes/api/urls/urls.test.ts
+index dd41378..4ac086d 100644
+--- a/server/routes/api/urls/urls.test.ts
++++ b/server/routes/api/urls/urls.test.ts
+@@ -352,6 +352,25 @@ Install instructions here.`
+     expect(body.id).toEqual(document.id);
+   });
+ 
++  it("should fail with status 404 not found when share url has a malformed document slug", async () => {
++    const document = await buildDocument({
++      teamId: user.teamId,
++    });
++    const share = await buildShare({
++      teamId: user.teamId,
++      userId: user.id,
++      documentId: document.id,
++      published: true,
++    });
++
++    const res = await server.post("/api/urls.unfurl", user, {
++      body: {
++        url: `${env.URL}/s/${share.id}/doc/invalid`,
++      },
++    });
++    expect(res.status).toEqual(404);
++  });
++
+   it("should succeed with status 200 ok when share url with urlId is supplied", async () => {
+     const document = await buildDocument({
+       teamId: user.teamId,

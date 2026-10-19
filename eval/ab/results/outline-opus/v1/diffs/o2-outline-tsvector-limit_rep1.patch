@@ -1,0 +1,169 @@
+diff --git a/server/migrations/20261019120000-fit-document-search-vector-size.js b/server/migrations/20261019120000-fit-document-search-vector-size.js
+new file mode 100644
+index 0000000..7b3235f
+--- /dev/null
++++ b/server/migrations/20261019120000-fit-document-search-vector-size.js
+@@ -0,0 +1,69 @@
++"use strict";
++
++/**
++ * Postgres limits the size of a tsvector to 1MB. Capping the input text is not
++ * enough to stay below it: text made of mostly unique tokens (hashes, IDs,
++ * base64) can produce a vector larger than the input. When the full vector is
++ * too large, binary search for the longest prefix of the text that fits, while
++ * always indexing the title and previous titles in full.
++ */
++
++/** @type {import('sequelize-cli').Migration} */
++module.exports = {
++  async up(queryInterface) {
++    await queryInterface.sequelize.query(`
++    CREATE OR REPLACE FUNCTION documents_search_trigger() RETURNS trigger AS $$
++    declare
++      title_vector tsvector;
++      body text;
++      lo integer;
++      hi integer;
++      mid integer;
++    begin
++      title_vector :=
++        setweight(to_tsvector('english', coalesce(new.title, '')),'A') ||
++        setweight(to_tsvector('english', coalesce(array_to_string(new."previousTitles", ' , '),'')),'C');
++      body := substring(coalesce(new.text, ''), 1, 1000000);
++
++      begin
++        new."searchVector" := title_vector || setweight(to_tsvector('english', body), 'D');
++        return new;
++      exception when program_limit_exceeded then
++        -- The vector is too large, fall through and index a prefix of the text.
++      end;
++
++      -- Invariant: a prefix of length lo fits, a prefix of length hi does not.
++      lo := 0;
++      hi := length(body);
++      new."searchVector" := title_vector;
++
++      while hi - lo > 1000 loop
++        mid := lo + (hi - lo) / 2;
++        begin
++          new."searchVector" := title_vector || setweight(to_tsvector('english', substring(body, 1, mid)), 'D');
++          lo := mid;
++        exception when program_limit_exceeded then
++          hi := mid;
++        end;
++      end loop;
++
++      return new;
++    end
++    $$ LANGUAGE plpgsql;
++    `);
++  },
++
++  async down(queryInterface) {
++    await queryInterface.sequelize.query(`
++    CREATE OR REPLACE FUNCTION documents_search_trigger() RETURNS trigger AS $$
++    begin
++      new."searchVector" :=
++        setweight(to_tsvector('english', coalesce(new.title, '')),'A') ||
++        setweight(to_tsvector('english', coalesce(array_to_string(new."previousTitles", ' , '),'')),'C') ||
++        setweight(to_tsvector('english', substring(coalesce(new.text, ''), 1, 1000000)), 'D');
++      return new;
++    end
++    $$ LANGUAGE plpgsql;
++    `);
++  },
++};
+diff --git a/server/models/Document.test.ts b/server/models/Document.test.ts
+index 0aa8aca..e3834e5 100644
+--- a/server/models/Document.test.ts
++++ b/server/models/Document.test.ts
+@@ -1,4 +1,5 @@
+-import { EmptyResultError, Op } from "sequelize";
++import { randomBytes } from "node:crypto";
++import { EmptyResultError, Op, QueryTypes } from "sequelize";
+ import { CollectionPermission, DocumentPermission } from "@shared/types";
+ import slugify from "@shared/utils/slugify";
+ import { parser } from "@server/editor";
+@@ -167,6 +168,82 @@ describe("#save", () => {
+   });
+ });
+ 
++describe("searchVector", () => {
++  const matches = async (document: Document, query: string) => {
++    const [row] = await sequelize.query<{ matches: boolean }>(
++      `SELECT "searchVector" @@ to_tsquery('english', :query) AS matches FROM documents WHERE id = :id`,
++      {
++        type: QueryTypes.SELECT,
++        replacements: { id: document.id, query },
++      }
++    );
++    return row.matches;
++  };
++
++  const lexemeCount = async (document: Document) => {
++    const [row] = await sequelize.query<{ count: number }>(
++      `SELECT length("searchVector") AS count FROM documents WHERE id = :id`,
++      { type: QueryTypes.SELECT, replacements: { id: document.id } }
++    );
++    return Number(row.count);
++  };
++
++  // Text made of unique tokens produces a tsvector larger than the input, so
++  // this stays below the 1,000,000 character input cap yet exceeds the 1MB
++  // tsvector limit when indexed in full.
++  const uniqueTokens = (length: number) => {
++    const tokens: string[] = [];
++    let size = 0;
++    while (size < length) {
++      const token = randomBytes(16).toString("hex");
++      tokens.push(token);
++      size += token.length + 1;
++    }
++    return tokens.join(" ");
++  };
++
++  test("should index title, previous titles and text", async () => {
++    const document = await buildDocument({
++      title: "Quarterly",
++      text: "aardvark in the middle zebra",
++    });
++    document.title = "Annual";
++    await document.save();
++
++    expect(await matches(document, "annual:A")).toBe(true);
++    expect(await matches(document, "quarterly:C")).toBe(true);
++    expect(await matches(document, "aardvark:D")).toBe(true);
++    expect(await matches(document, "zebra:D")).toBe(true);
++  });
++
++  test("should save text whose full search vector is too large", async () => {
++    const document = await buildDocument({ title: "Quarterly" });
++    document.title = "Annual";
++    await document.save();
++
++    const text = `aardvark ${uniqueTokens(990000)} zebra`;
++    expect(text.length).toBeLessThan(1000000);
++    document.text = text;
++    await document.save();
++
++    const reloaded = await Document.unscoped().findByPk(document.id, {
++      rejectOnEmpty: true,
++    });
++    expect(reloaded.text).toBe(text);
++
++    // Titles remain fully indexed with their usual weights.
++    expect(await matches(document, "annual:A")).toBe(true);
++    expect(await matches(document, "quarterly:C")).toBe(true);
++
++    // The beginning of the text is indexed, the end is not.
++    expect(await matches(document, "aardvark:D")).toBe(true);
++    expect(await matches(document, "zebra")).toBe(false);
++
++    // As much of the text as fits is indexed, not just a token or two.
++    expect(await lexemeCount(document)).toBeGreaterThan(20000);
++  });
++});
++
+ describe("#findAllChildDocumentIds", () => {
+   test("should return empty array if no children", async () => {
+     const team = await buildTeam();

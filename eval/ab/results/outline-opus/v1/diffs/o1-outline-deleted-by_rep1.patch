@@ -1,0 +1,388 @@
+diff --git a/server/migrations/20261019120000-add-deleted-by-id-to-documents.js b/server/migrations/20261019120000-add-deleted-by-id-to-documents.js
+new file mode 100644
+index 0000000..c12803b
+--- /dev/null
++++ b/server/migrations/20261019120000-add-deleted-by-id-to-documents.js
+@@ -0,0 +1,36 @@
++"use strict";
++
++/** @type {import('sequelize-cli').Migration} */
++module.exports = {
++  async up(queryInterface, Sequelize) {
++    return queryInterface.sequelize.transaction(async (transaction) => {
++      await queryInterface.addColumn(
++        "documents",
++        "deletedById",
++        {
++          type: Sequelize.UUID,
++          allowNull: true,
++          references: {
++            model: "users",
++            key: "id",
++          },
++          onDelete: "SET NULL",
++        },
++        { transaction }
++      );
++
++      // Previously the deleting user was inferred from the last modifier, so
++      // carry that attribution over for documents that are already deleted.
++      await queryInterface.bulkUpdate(
++        "documents",
++        { deletedById: Sequelize.col("lastModifiedById") },
++        { deletedAt: { [Sequelize.Op.ne]: null } },
++        { transaction }
++      );
++    });
++  },
++
++  async down(queryInterface) {
++    await queryInterface.removeColumn("documents", "deletedById");
++  },
++};
+diff --git a/server/models/Collection.ts b/server/models/Collection.ts
+index ba51ab7..e0a83ba 100644
+--- a/server/models/Collection.ts
++++ b/server/models/Collection.ts
+@@ -425,6 +425,7 @@ class Collection extends ParanoidModel<
+     await Document.update(
+       {
+         lastModifiedById: ctx.auth.user.id,
++        deletedById: ctx.auth.user.id,
+         deletedAt: new Date(),
+       },
+       {
+@@ -891,15 +892,17 @@ class Collection extends ParanoidModel<
+       for (const childDocumentId of childDocumentIds) {
+         const childDocument = childDocumentsById[childDocumentId];
+         if (childDocument) {
+-          // Attributes the deletion of the whole tree to the acting user, which
+-          // the trash relies on to show a person their own deletions.
+-          childDocument.lastModifiedById = user.id;
+-          childDocument.updatedBy = user;
++          // Attributes the deletion of the whole tree to the acting user
++          // without rewriting the edit history of nested documents.
++          childDocument.deletedById = user.id;
++          childDocument.deletedBy = user;
+           await childDocument.destroy(options);
+         }
+       }
+     }
+ 
++    document.deletedById = user.id;
++    document.deletedBy = user;
+     await document.destroy(options);
+   };
+ 
+diff --git a/server/models/Document.test.ts b/server/models/Document.test.ts
+index 8c27e28..d177852 100644
+--- a/server/models/Document.test.ts
++++ b/server/models/Document.test.ts
+@@ -105,8 +105,79 @@ describe("#destroyWithCtx", () => {
+       paranoid: false,
+     });
+     expect(deletedDocument?.lastModifiedById).toBe(user.id);
++    expect(deletedDocument?.deletedById).toBe(user.id);
+     expect(deletedDocument?.deletedAt).toBeTruthy();
+   });
++
++  test("should record the deleting user", async () => {
++    const document = await buildDocument();
++    const user = await buildUser({ teamId: document.teamId });
++    await withAPIContext(user, (ctx) => document.destroyWithCtx(ctx));
++
++    const deletedDocument = await Document.findByPk(document.id, {
++      paranoid: false,
++    });
++    expect(deletedDocument?.deletedById).toBe(user.id);
++  });
++
++  test("should record the deleting user on nested documents without changing their last modifier", async () => {
++    const author = await buildUser();
++    const user = await buildUser({ teamId: author.teamId });
++    const collection = await buildCollection({ teamId: author.teamId });
++    const document = await buildDocument({
++      userId: author.id,
++      teamId: author.teamId,
++      collectionId: collection.id,
++    });
++    const child = await buildDocument({
++      userId: author.id,
++      teamId: author.teamId,
++      collectionId: collection.id,
++      parentDocumentId: document.id,
++    });
++    const grandchild = await buildDocument({
++      userId: author.id,
++      teamId: author.teamId,
++      collectionId: collection.id,
++      parentDocumentId: child.id,
++    });
++
++    await withAPIContext(user, (ctx) => document.destroyWithCtx(ctx));
++
++    const [newDocument, newChild, newGrandchild] = await Promise.all([
++      document.reload({ paranoid: false }),
++      child.reload({ paranoid: false }),
++      grandchild.reload({ paranoid: false }),
++    ]);
++    expect(newDocument.deletedById).toBe(user.id);
++    expect(newDocument.lastModifiedById).toBe(user.id);
++    for (const nested of [newChild, newGrandchild]) {
++      expect(nested.deletedAt).toBeTruthy();
++      expect(nested.deletedById).toBe(user.id);
++      expect(nested.lastModifiedById).toBe(author.id);
++    }
++  });
++});
++
++describe("#restoreTo", () => {
++  test("should clear the deleting user", async () => {
++    const user = await buildUser();
++    const collection = await buildCollection({ teamId: user.teamId });
++    const document = await buildDocument({
++      userId: user.id,
++      teamId: user.teamId,
++      collectionId: collection.id,
++    });
++    await withAPIContext(user, (ctx) => document.destroyWithCtx(ctx));
++    expect(document.deletedById).toBe(user.id);
++
++    await withAPIContext(user, (ctx) =>
++      document.restoreTo(ctx, { collectionId: collection.id })
++    );
++    const restored = await Document.findByPk(document.id);
++    expect(restored?.deletedAt).toBeNull();
++    expect(restored?.deletedById).toBeNull();
++  });
+ });
+ 
+ describe("#save", () => {
+diff --git a/server/models/Document.ts b/server/models/Document.ts
+index 61ef7fe..93168e3 100644
+--- a/server/models/Document.ts
++++ b/server/models/Document.ts
+@@ -192,6 +192,14 @@ interface QueryGeneratorWithWhere {
+       },
+     ],
+   },
++  withDeletedBy: {
++    include: [
++      {
++        association: "deletedBy",
++        paranoid: false,
++      },
++    ],
++  },
+   withViews: (userId: string) => {
+     if (!userId) {
+       return {};
+@@ -684,6 +692,15 @@ class Document extends ArchivableModel<
+   @Column(DataType.UUID)
+   createdById: string;
+ 
++  /** The user that soft deleted the document, if it is deleted. */
++  @BelongsTo(() => User, "deletedById")
++  deletedBy?: User | null;
++
++  @AllowNull
++  @ForeignKey(() => User)
++  @Column(DataType.UUID)
++  deletedById?: string | null;
++
+   @ForeignKey(() => Template)
+   @Column(DataType.UUID)
+   templateId: string;
+@@ -1417,6 +1434,8 @@ class Document extends ArchivableModel<
+     }
+ 
+     if (this.deletedAt) {
++      this.deletedById = null;
++      this.deletedBy = null;
+       await this.restore({ transaction });
+       this.collectionId = collectionId;
+       await this.saveWithCtx(ctx, undefined, { name: "restore" });
+@@ -1457,6 +1476,8 @@ class Document extends ArchivableModel<
+     }
+ 
+     if (!deleted) {
++      this.deletedById = user.id;
++      this.deletedBy = user;
+       await this.destroy({ transaction });
+     }
+ 
+diff --git a/server/presenters/document.ts b/server/presenters/document.ts
+index 3cd4f33..1e0deb2 100644
+--- a/server/presenters/document.ts
++++ b/server/presenters/document.ts
+@@ -80,6 +80,7 @@ async function presentDocument(
+     publishedAt: document.publishedAt,
+     archivedAt: document.archivedAt,
+     deletedAt: document.deletedAt,
++    deletedBy: undefined,
+     collaboratorIds: [],
+     revision: document.revisionCount,
+     fullWidth: document.fullWidth,
+@@ -110,6 +111,12 @@ async function presentDocument(
+     res.parentDocumentId = document.parentDocumentId;
+     res.createdBy = presentUser(document.createdBy);
+     res.updatedBy = presentUser(document.updatedBy);
++    if (document.deletedAt && document.deletedById) {
++      const deletedBy =
++        document.deletedBy ??
++        (await document.$get("deletedBy", { paranoid: false }));
++      res.deletedBy = deletedBy ? presentUser(deletedBy) : undefined;
++    }
+     res.collaboratorIds = document.collaboratorIds ?? [];
+     res.templateId = document.templateId;
+     res.insightsEnabled = document.insightsEnabled;
+diff --git a/server/routes/api/documents/documents.test.ts b/server/routes/api/documents/documents.test.ts
+index 4a8c6d7..6f28f66 100644
+--- a/server/routes/api/documents/documents.test.ts
++++ b/server/routes/api/documents/documents.test.ts
+@@ -181,6 +181,42 @@ describe("#documents.info", () => {
+     expect(body.data.id).toEqual(document.id);
+   });
+ 
++  it("should not include deletedBy for a document that is not deleted", async () => {
++    const user = await buildUser();
++    const document = await buildDocument({
++      userId: user.id,
++      teamId: user.teamId,
++    });
++    const res = await server.post("/api/documents.info", user, {
++      body: {
++        id: document.id,
++      },
++    });
++    const body = await res.json();
++    expect(res.status).toEqual(200);
++    expect(body.data.deletedBy).toBeUndefined();
++  });
++
++  it("should include the user that deleted a deleted document", async () => {
++    const user = await buildUser();
++    const deleter = await buildAdmin({ teamId: user.teamId });
++    const document = await buildDocument({
++      userId: user.id,
++      teamId: user.teamId,
++    });
++    await withAPIContext(deleter, (ctx) => document.destroyWithCtx(ctx));
++    const res = await server.post("/api/documents.info", deleter, {
++      body: {
++        id: document.id,
++      },
++    });
++    const body = await res.json();
++    expect(res.status).toEqual(200);
++    expect(body.data.deletedAt).toBeTruthy();
++    expect(body.data.deletedBy.id).toEqual(deleter.id);
++    expect(body.data.deletedBy.name).toEqual(deleter.name);
++  });
++
+   it("should return published document for urlId", async () => {
+     const user = await buildUser();
+     const document = await buildDocument({
+@@ -4798,6 +4834,7 @@ describe("#documents.deleted", () => {
+     expect(body.data.length).toEqual(1);
+     expect(body.data[0].id).toEqual(document.id);
+     expect(body.data[0].updatedBy.id).toEqual(user.id);
++    expect(body.data[0].deletedBy.id).toEqual(user.id);
+ 
+     const otherRes = await server.post("/api/documents.deleted", user, {
+       body: {
+@@ -4828,7 +4865,8 @@ describe("#documents.deleted", () => {
+     await withAPIContext(user, (ctx) => document.destroyWithCtx(ctx));
+ 
+     await childDocument.reload({ paranoid: false });
+-    expect(childDocument.lastModifiedById).toEqual(user.id);
++    expect(childDocument.deletedById).toEqual(user.id);
++    expect(childDocument.lastModifiedById).toEqual(other.id);
+ 
+     const res = await server.post("/api/documents.deleted", user, {
+       body: {
+@@ -4838,6 +4876,22 @@ describe("#documents.deleted", () => {
+     const body = await res.json();
+     expect(res.status).toEqual(200);
+     expect(body.data.length).toEqual(2);
++    for (const data of body.data) {
++      expect(data.deletedBy.id).toEqual(user.id);
++    }
++    const child = body.data.find(
++      (data: { id: string }) => data.id === childDocument.id
++    );
++    expect(child.updatedBy.id).toEqual(other.id);
++
++    const otherRes = await server.post("/api/documents.deleted", user, {
++      body: {
++        filters: [{ field: "deletedById", operator: "eq", value: other.id }],
++      },
++    });
++    const otherBody = await otherRes.json();
++    expect(otherRes.status).toEqual(200);
++    expect(otherBody.data.length).toEqual(0);
+   });
+ 
+   it("should reject filters on fields outside the allowlist", async () => {
+@@ -5482,6 +5536,33 @@ describe("#documents.restore", () => {
+     expect(body.data.collectionId).toEqual(anotherCollection.id);
+   });
+ 
++  it("should clear the deleting user when restoring a deleted document", async () => {
++    const user = await buildUser();
++    const collection = await buildCollection({
++      userId: user.id,
++      teamId: user.teamId,
++    });
++    const document = await buildDocument({
++      userId: user.id,
++      collectionId: collection.id,
++      teamId: user.teamId,
++    });
++    await withAPIContext(user, (ctx) => document.destroyWithCtx(ctx));
++
++    const res = await server.post("/api/documents.restore", user, {
++      body: {
++        id: document.id,
++      },
++    });
++    const body = await res.json();
++    expect(res.status).toEqual(200);
++    expect(body.data.deletedAt).toEqual(null);
++    expect(body.data.deletedBy).toBeUndefined();
++
++    await document.reload();
++    expect(document.deletedById).toBeNull();
++  });
++
+   it("should not allow restore of documents to a deleted collection", async () => {
+     const team = await buildTeam();
+     const user = await buildUser({ teamId: team.id });
+diff --git a/server/routes/api/documents/documents.ts b/server/routes/api/documents/documents.ts
+index bf93a22..4db22a7 100644
+--- a/server/routes/api/documents/documents.ts
++++ b/server/routes/api/documents/documents.ts
+@@ -570,21 +570,17 @@ router.post(
+       ],
+     };
+ 
+-    // The deleting user is currently recorded as the last to modify the
+-    // document, so the public `deletedById` field maps onto that column.
+     const filter = combineFilters(rawFilters);
+     if (filter) {
+       await authorizeFilterFields(user, filter);
+-      const mapped = mapFilterFields(filter, {
+-        deletedById: "lastModifiedById",
+-      });
+-      where[Op.and].push(buildWhere<Document>(mapped));
++      where[Op.and].push(buildWhere<Document>(filter));
+     }
+ 
+     const documents = await Document.scope([
+       membershipScope,
+       viewScope,
+       "withDrafts",
++      "withDeletedBy",
+     ]).findAll({
+       where,
+       paranoid: false,

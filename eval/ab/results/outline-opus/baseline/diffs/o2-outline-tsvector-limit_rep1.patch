@@ -1,0 +1,164 @@
+diff --git a/server/migrations/20261019120000-handle-oversized-document-search-vector.js b/server/migrations/20261019120000-handle-oversized-document-search-vector.js
+new file mode 100644
+index 0000000..2ff9ed1
+--- /dev/null
++++ b/server/migrations/20261019120000-handle-oversized-document-search-vector.js
+@@ -0,0 +1,70 @@
++"use strict";
++
++/** @type {import('sequelize-cli').Migration} */
++module.exports = {
++  async up(queryInterface) {
++    // Postgres limits the size of a tsvector (~1MB) rather than its input, so
++    // text made up of mostly unique tokens can overflow even when truncated to
++    // 1,000,000 characters. When that happens, fall back to a binary search for
++    // the longest prefix of the text that still fits, keeping the title and
++    // previous titles fully indexed.
++    await queryInterface.sequelize.query(`
++    CREATE OR REPLACE FUNCTION documents_search_trigger() RETURNS trigger AS $$
++    declare
++      "titleVector" tsvector;
++      "body" text;
++      "lo" integer;
++      "hi" integer;
++      "mid" integer;
++    begin
++      "titleVector" :=
++        setweight(to_tsvector('english', coalesce(new.title, '')),'A') ||
++        setweight(to_tsvector('english', coalesce(array_to_string(new."previousTitles", ' , '),'')),'C');
++      "body" := substring(coalesce(new.text, ''), 1, 1000000);
++
++      begin
++        new."searchVector" :=
++          "titleVector" ||
++          setweight(to_tsvector('english', "body"), 'D');
++        return new;
++      exception when program_limit_exceeded then
++        -- fall through to indexing a prefix of the text
++      end;
++
++      -- invariant: a prefix of length "lo" fits, a prefix of length "hi" does not
++      new."searchVector" := "titleVector";
++      "lo" := 0;
++      "hi" := length("body");
++
++      while "hi" - "lo" > greatest(1000, "hi" / 100) loop
++        "mid" := ("lo" + "hi") / 2;
++        begin
++          new."searchVector" :=
++            "titleVector" ||
++            setweight(to_tsvector('english', substring("body", 1, "mid")), 'D');
++          "lo" := "mid";
++        exception when program_limit_exceeded then
++          "hi" := "mid";
++        end;
++      end loop;
++
++      return new;
++    end
++    $$ LANGUAGE plpgsql;
++    `);
++  },
++
++  async down(queryInterface) {
++    await queryInterface.sequelize.query(`
++    CREATE OR REPLACE FUNCTION documents_search_trigger() RETURNS trigger AS $$
++    begin
++      new."searchVector" :=
++        setweight(to_tsvector('english', coalesce(new.title, '')),'A') ||
++        setweight(to_tsvector('english', coalesce(array_to_string(new."previousTitles", ' , '),'')),'C') ||
++        setweight(to_tsvector('english', substring(coalesce(new.text, ''), 1, 1000000)), 'D');
++      return new;
++    end
++    $$ LANGUAGE plpgsql;
++    `);
++  },
++};
+diff --git a/server/models/Document.test.ts b/server/models/Document.test.ts
+index 0aa8aca..793778f 100644
+--- a/server/models/Document.test.ts
++++ b/server/models/Document.test.ts
+@@ -1,4 +1,5 @@
+-import { EmptyResultError, Op } from "sequelize";
++import { createHash } from "node:crypto";
++import { EmptyResultError, Op, QueryTypes } from "sequelize";
+ import { CollectionPermission, DocumentPermission } from "@shared/types";
+ import slugify from "@shared/utils/slugify";
+ import { parser } from "@server/editor";
+@@ -167,6 +168,76 @@ describe("#save", () => {
+   });
+ });
+ 
++describe("searchVector", () => {
++  /**
++   * Builds text made of unique tokens that produces a tsvector larger than
++   * the Postgres size limit, while staying under the trigger's input cap.
++   */
++  const buildOversizedText = () =>
++    [
++      "beginningmarker",
++      ...Array.from({ length: 30000 }, (_, i) =>
++        createHash("md5").update(String(i)).digest("hex")
++      ),
++      "endingmarker",
++    ].join(" ");
++
++  const matches = async (documentId: string, query: string) => {
++    const [row] = await sequelize.query<{ matches: boolean }>(
++      `SELECT "searchVector" @@ to_tsquery('english', :query) AS matches FROM documents WHERE id = :documentId`,
++      {
++        type: QueryTypes.SELECT,
++        replacements: { documentId, query },
++      }
++    );
++    return row.matches;
++  };
++
++  test("should index the full text when it fits", async () => {
++    const document = await buildDocument({
++      title: "Quarterly roadmap",
++      text: "First paragraph with uniqueword at the end",
++    });
++
++    expect(await matches(document.id, "quarterly:A")).toBe(true);
++    expect(await matches(document.id, "uniqueword:D")).toBe(true);
++    expect(await matches(document.id, "uniqueword:A")).toBe(false);
++  });
++
++  test("should index a prefix of the text when the full text is too large", async () => {
++    const text = buildOversizedText();
++    expect(text.length).toBeLessThan(1000000);
++
++    const document = await buildDocument({
++      title: "Hashes",
++      text,
++    });
++
++    expect(await matches(document.id, "hashes:A")).toBe(true);
++    expect(await matches(document.id, "beginningmarker:D")).toBe(true);
++    expect(await matches(document.id, "endingmarker")).toBe(false);
++  });
++
++  test("should save oversized text on update and keep titles indexed", async () => {
++    const document = await buildDocument({
++      title: "Original heading",
++      text: "short text",
++    });
++    document.title = "Renamed heading";
++    await document.save();
++
++    document.text = buildOversizedText();
++    await expect(document.save()).resolves.toBeDefined();
++
++    const reloaded = await Document.findByPk(document.id);
++    expect(reloaded?.text).toEqual(document.text);
++    expect(await matches(document.id, "renamed:A")).toBe(true);
++    expect(await matches(document.id, "original:C")).toBe(true);
++    expect(await matches(document.id, "beginningmarker:D")).toBe(true);
++    expect(await matches(document.id, "short")).toBe(false);
++  });
++});
++
+ describe("#findAllChildDocumentIds", () => {
+   test("should return empty array if no children", async () => {
+     const team = await buildTeam();

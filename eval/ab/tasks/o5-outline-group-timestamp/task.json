@@ -1,0 +1,48 @@
+{
+  "id": "o5-outline-group-timestamp",
+  "repo": "outline",
+  "commit": "6509bf553b67d17e481c86eb40fdb3b475a60158",
+  "source_fix": "outline/outline@ed4aaf274d (2026-09-25, #13888): fix: Update group timestamp when membership changes",
+  "tags": ["real-fix", "hidden-acs", "large-repo", "hard", "multi-file"],
+  "prompt": "prompt.md",
+  "solution": "solution.patch",
+  "supp_files": {
+    "server/models/Group.test.ts": "supp/server/models/Group.test.ts",
+    "server/routes/api/groups/groups.test.ts": "supp/server/routes/api/groups/groups.test.ts"
+  },
+  "regression_paths": ["server/models/Group.test.ts", "server/routes/api/groups/groups.test.ts", "server/commands/groupsSyncer.test.ts"],
+  "acceptance": [
+    { "id": "AC1", "visibility": "shown", "source": "orig",
+      "desc": "groups.add_user bumps updatedAt and returns it",
+      "file": "server/routes/api/groups/groups.test.ts",
+      "title": "#groups.add_user > should add user to group", "null_expect": "fail" },
+    { "id": "AC2", "visibility": "shown", "source": "orig",
+      "desc": "groups.remove_user bumps updatedAt and returns it",
+      "file": "server/routes/api/groups/groups.test.ts",
+      "title": "#groups.remove_user > should remove user from group", "null_expect": "fail" },
+    { "id": "AC3", "visibility": "shown", "source": "orig",
+      "desc": "a membership created outside the API (model level) bumps updatedAt",
+      "file": "server/models/Group.test.ts",
+      "title": "Group > updatedAt > updates when a user is added", "null_expect": "fail" },
+    { "id": "AC4", "visibility": "hidden", "source": "orig",
+      "desc": "a bulk destroy with individual hooks (how user deletion removes memberships) bumps updatedAt",
+      "file": "server/models/Group.test.ts",
+      "title": "Group > updatedAt > updates when a user is removed by a bulk destroy", "null_expect": "fail",
+      "leak_strings": ["bulk destroy", "individualHooks"] },
+    { "id": "AC5", "visibility": "hidden", "source": "orig",
+      "desc": "a rolled-back membership creation leaves updatedAt alone",
+      "file": "server/models/Group.test.ts",
+      "title": "Group > updatedAt > does not update when a membership creation is rolled back", "null_expect": "pass",
+      "leak_strings": ["rolled back", "rollback", "transaction"] },
+    { "id": "AC6", "visibility": "hidden", "source": "orig",
+      "desc": "re-adding an existing member does not bump updatedAt",
+      "file": "server/routes/api/groups/groups.test.ts",
+      "title": "#groups.add_user > should not update the group when the user is already a member", "null_expect": "pass",
+      "leak_strings": ["already a member"] }
+  ],
+  "decoys": [
+    { "patch": "decoy-outside-transaction.patch",
+      "desc": "the full fix, but the group is touched outside the caller's transaction",
+      "expect": { "AC1": "pass", "AC2": "pass", "AC3": "pass", "AC4": "pass", "AC5": "fail" } }
+  ]
+}

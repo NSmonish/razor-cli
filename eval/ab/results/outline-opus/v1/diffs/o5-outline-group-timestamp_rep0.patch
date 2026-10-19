@@ -1,0 +1,357 @@
+diff --git a/server/commands/groupsSyncer.test.ts b/server/commands/groupsSyncer.test.ts
+index 59abb23..c269a4b 100644
+--- a/server/commands/groupsSyncer.test.ts
++++ b/server/commands/groupsSyncer.test.ts
+@@ -187,4 +187,55 @@ describe("groupsSyncer", () => {
+ 
+     expect(result.membershipsRemoved).toEqual(1);
+   });
++
++  it("should bump group updatedAt when memberships change", async () => {
++    const user = await buildUser();
++    const team = await user.$get("team")!;
++    const authenticationProvider = (await AuthenticationProvider.findOne({
++      where: { teamId: user.teamId },
++    }))!;
++    const sync = (externalGroups: { id: string; name: string }[]) =>
++      sequelize.transaction(async (transaction) =>
++        groupsSyncer(createContext({ user, transaction, ip }), {
++          user,
++          team: team!,
++          authenticationProvider,
++          externalGroups,
++        })
++      );
++    const backdate = (group: Group) =>
++      Group.update(
++        {
++          name: group.name,
++          updatedAt: new Date(Date.now() - 24 * 60 * 60 * 1000),
++        },
++        {
++          where: { id: group.id },
++          silent: true,
++          hooks: false,
++          validate: false,
++        }
++      );
++
++    await sync([{ id: "ext-1", name: "Engineering" }]);
++    const group = (await Group.findOne({
++      where: { teamId: user.teamId, name: "Engineering" },
++    }))!;
++
++    // Removal
++    await backdate(group);
++    await group.reload();
++    const beforeRemoval = group.updatedAt;
++    await sync([]);
++    await group.reload();
++    expect(group.updatedAt.getTime()).toBeGreaterThan(beforeRemoval.getTime());
++
++    // Re-adding to an existing group
++    await backdate(group);
++    await group.reload();
++    const beforeAdd = group.updatedAt;
++    await sync([{ id: "ext-1", name: "Engineering" }]);
++    await group.reload();
++    expect(group.updatedAt.getTime()).toBeGreaterThan(beforeAdd.getTime());
++  });
+ });
+diff --git a/server/models/GroupUser.test.ts b/server/models/GroupUser.test.ts
+new file mode 100644
+index 0000000..c20df9a
+--- /dev/null
++++ b/server/models/GroupUser.test.ts
+@@ -0,0 +1,61 @@
++import { subDays } from "date-fns";
++import { buildGroup, buildGroupUser } from "@server/test/factories";
++import Group from "./Group";
++import GroupUser from "./GroupUser";
++
++const backdate = (group: Group) =>
++  Group.update(
++    { name: group.name, updatedAt: subDays(new Date(), 1) },
++    { where: { id: group.id }, silent: true, hooks: false, validate: false }
++  );
++
++describe("GroupUser", () => {
++  describe("hooks", () => {
++    it("should bump group updatedAt when a member is added", async () => {
++      const group = await buildGroup();
++      await backdate(group);
++      await group.reload();
++      const before = group.updatedAt;
++
++      await buildGroupUser({ groupId: group.id, teamId: group.teamId });
++
++      await group.reload();
++      expect(group.updatedAt.getTime()).toBeGreaterThan(before.getTime());
++    });
++
++    it("should bump group updatedAt when a member is removed", async () => {
++      const group = await buildGroup();
++      const groupUser = await buildGroupUser({
++        groupId: group.id,
++        teamId: group.teamId,
++      });
++      await backdate(group);
++      await group.reload();
++      const before = group.updatedAt;
++
++      await groupUser.destroy();
++
++      await group.reload();
++      expect(group.updatedAt.getTime()).toBeGreaterThan(before.getTime());
++    });
++
++    it("should bump group updatedAt on bulk destroy with individual hooks", async () => {
++      const group = await buildGroup();
++      const groupUser = await buildGroupUser({
++        groupId: group.id,
++        teamId: group.teamId,
++      });
++      await backdate(group);
++      await group.reload();
++      const before = group.updatedAt;
++
++      await GroupUser.destroy({
++        where: { userId: groupUser.userId },
++        individualHooks: true,
++      });
++
++      await group.reload();
++      expect(group.updatedAt.getTime()).toBeGreaterThan(before.getTime());
++    });
++  });
++});
+diff --git a/server/models/GroupUser.ts b/server/models/GroupUser.ts
+index fff0277..180b17a 100644
+--- a/server/models/GroupUser.ts
++++ b/server/models/GroupUser.ts
+@@ -1,4 +1,9 @@
+-import type { InferAttributes, InferCreationAttributes } from "sequelize";
++import type {
++  CreateOptions,
++  InferAttributes,
++  InferCreationAttributes,
++  InstanceDestroyOptions,
++} from "sequelize";
+ import {
+   AfterCreate,
+   AfterDestroy,
+@@ -77,6 +82,50 @@ class GroupUser extends Model<
+   static async invalidateDocumentIdsAfterDestroy(model: GroupUser) {
+     await Document.invalidateMembershipDocumentIds([model.userId]);
+   }
++
++  @AfterCreate
++  static async touchGroupAfterCreate(
++    model: GroupUser,
++    options: CreateOptions<GroupUser>
++  ) {
++    await GroupUser.touchGroup(model, options);
++  }
++
++  @AfterDestroy
++  static async touchGroupAfterDestroy(
++    model: GroupUser,
++    options: InstanceDestroyOptions
++  ) {
++    await GroupUser.touchGroup(model, options);
++  }
++
++  /**
++   * Bump the parent group's updatedAt so that clients can detect that the
++   * group's membership has changed.
++   *
++   * @param model The group membership that was created or destroyed.
++   * @param options The options of the operation, used for the transaction.
++   */
++  private static async touchGroup(
++    model: GroupUser,
++    options: CreateOptions<GroupUser> | InstanceDestroyOptions
++  ) {
++    const group = await Group.findByPk(model.groupId, {
++      transaction: options.transaction,
++    });
++    if (!group) {
++      return;
++    }
++
++    // Sequelize skips updates where only the timestamp would change, so the
++    // attribute must be explicitly marked as changed.
++    group.changed("updatedAt", true);
++    await group.save({
++      transaction: options.transaction,
++      hooks: false,
++      validate: false,
++    });
++  }
+ }
+ 
+ export default GroupUser;
+diff --git a/server/queues/processors/UserDeletedProcessor.test.ts b/server/queues/processors/UserDeletedProcessor.test.ts
+index 8a6cf74..bc607a6 100644
+--- a/server/queues/processors/UserDeletedProcessor.test.ts
++++ b/server/queues/processors/UserDeletedProcessor.test.ts
+@@ -1,5 +1,11 @@
++import Group from "@server/models/Group";
+ import UserAuthentication from "@server/models/UserAuthentication";
+-import { buildUser, buildWebhookSubscription } from "@server/test/factories";
++import {
++  buildGroup,
++  buildGroupUser,
++  buildUser,
++  buildWebhookSubscription,
++} from "@server/test/factories";
+ import UserDeletedProcessor from "./UserDeletedProcessor";
+ 
+ const ip = "127.0.0.1";
+@@ -52,4 +58,35 @@ describe("UserDeletedProcessor", () => {
+     await webhook.reload();
+     expect(webhook.enabled).toEqual(false);
+   });
++
++  it("should bump updatedAt of groups the user was a member of", async () => {
++    const user = await buildUser();
++    const group = await buildGroup({ teamId: user.teamId });
++    await buildGroupUser({
++      groupId: group.id,
++      userId: user.id,
++      teamId: user.teamId,
++    });
++    await Group.update(
++      {
++        name: group.name,
++        updatedAt: new Date(Date.now() - 24 * 60 * 60 * 1000),
++      },
++      { where: { id: group.id }, silent: true, hooks: false, validate: false }
++    );
++    await group.reload();
++    const before = group.updatedAt;
++
++    const processor = new UserDeletedProcessor();
++    await processor.perform({
++      name: "users.delete",
++      userId: user.id,
++      actorId: user.id,
++      teamId: user.teamId,
++      ip,
++    });
++
++    await group.reload();
++    expect(group.updatedAt.getTime()).toBeGreaterThan(before.getTime());
++  });
+ });
+diff --git a/server/routes/api/groups/groups.test.ts b/server/routes/api/groups/groups.test.ts
+index 9689150..aee41c2 100644
+--- a/server/routes/api/groups/groups.test.ts
++++ b/server/routes/api/groups/groups.test.ts
+@@ -1,5 +1,10 @@
+ import type { Group, User } from "@server/models";
+-import { AuthenticationProvider, Event, ExternalGroup } from "@server/models";
++import {
++  AuthenticationProvider,
++  Event,
++  ExternalGroup,
++  Group as GroupModel,
++} from "@server/models";
+ import {
+   buildUser,
+   buildAdmin,
+@@ -627,7 +632,37 @@ describe("#groups.memberships", () => {
+   });
+ });
+ 
++const backdateGroup = (group: GroupModel) =>
++  GroupModel.update(
++    { name: group.name, updatedAt: new Date(Date.now() - 24 * 60 * 60 * 1000) },
++    { where: { id: group.id }, silent: true, hooks: false, validate: false }
++  );
++
+ describe("#groups.add_user", () => {
++  it("should return the group with a bumped updatedAt", async () => {
++    const user = await buildAdmin();
++    const group = await buildGroup({
++      teamId: user.teamId,
++    });
++    await backdateGroup(group);
++    await group.reload();
++    const before = group.updatedAt;
++
++    const res = await server.post("/api/groups.add_user", user, {
++      body: {
++        id: group.id,
++        userId: user.id,
++      },
++    });
++    const body = await res.json();
++    expect(res.status).toEqual(200);
++    await group.reload();
++    expect(group.updatedAt.getTime()).toBeGreaterThan(before.getTime());
++    expect(body.data.groups[0].updatedAt).toEqual(
++      group.updatedAt.toISOString()
++    );
++  });
++
+   it("should add user to group", async () => {
+     const user = await buildAdmin();
+     const group = await buildGroup({
+@@ -709,6 +744,36 @@ describe("#groups.add_user", () => {
+ });
+ 
+ describe("#groups.remove_user", () => {
++  it("should return the group with a bumped updatedAt", async () => {
++    const user = await buildAdmin();
++    const group = await buildGroup({
++      teamId: user.teamId,
++    });
++    await server.post("/api/groups.add_user", user, {
++      body: {
++        id: group.id,
++        userId: user.id,
++      },
++    });
++    await backdateGroup(group);
++    await group.reload();
++    const before = group.updatedAt;
++
++    const res = await server.post("/api/groups.remove_user", user, {
++      body: {
++        id: group.id,
++        userId: user.id,
++      },
++    });
++    const body = await res.json();
++    expect(res.status).toEqual(200);
++    await group.reload();
++    expect(group.updatedAt.getTime()).toBeGreaterThan(before.getTime());
++    expect(body.data.groups[0].updatedAt).toEqual(
++      group.updatedAt.toISOString()
++    );
++  });
++
+   it("should remove user from group", async () => {
+     const user = await buildAdmin();
+     const group = await buildGroup({
+diff --git a/server/routes/api/groups/groups.ts b/server/routes/api/groups/groups.ts
+index 6fc322f..76bf86f 100644
+--- a/server/routes/api/groups/groups.ts
++++ b/server/routes/api/groups/groups.ts
+@@ -497,6 +497,7 @@ router.post(
+     }
+ 
+     groupUser.user = user;
++    await group.reload({ transaction });
+ 
+     ctx.body = {
+       data: {
+@@ -553,6 +554,7 @@ router.post(
+     });
+ 
+     await groupUser?.destroyWithCtx(ctx, { name: "remove_user" });
++    await group.reload({ transaction });
+ 
+     ctx.body = {
+       data: {
