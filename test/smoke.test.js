@@ -56,8 +56,10 @@ test('extractScripts captures a namespaced migrate script without misreading tes
     scripts: { test: 'jest', 'test:dev': 'jest --watch', lint: 'eslint .', 'db:migrate': 'sequelize-cli db:migrate' },
   }));
   const d = scanRepo(tmp);
-  assert.equal(d.scripts.test, 'jest');
-  assert.equal(d.scripts.migrate, 'sequelize-cli db:migrate'); // namespaced migrate caught
+  assert.equal(d.scripts.test, 'npm test');
+  // namespaced migrate caught, and run by its real name
+  assert.equal(d.scripts.migrate, 'npm run db:migrate');
+  assert.deepEqual(d.script_sources.migrate, { name: 'db:migrate', body: 'sequelize-cli db:migrate' });
   assert.equal(d.scripts.dev, undefined); // test:dev must NOT be read as the dev script
   fs.rmSync(tmp, { recursive: true, force: true });
 });
@@ -164,4 +166,18 @@ test('razor init exits non-zero when input file is missing', () => {
       stdio: 'ignore',
     });
   }, 'missing input should make the CLI exit non-zero');
+});
+
+test('scripts run through the detected package manager', () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'razor-pm-'));
+  fs.writeFileSync(path.join(tmp, 'package.json'), JSON.stringify({
+    dependencies: { express: '^4' },
+    scripts: { test: 'jest', lint: 'eslint .', 'db:migrate': 'sequelize-cli db:migrate' },
+  }));
+  fs.writeFileSync(path.join(tmp, 'yarn.lock'), '');
+  const d = scanRepo(tmp);
+  assert.equal(d.scripts.test, 'yarn test');
+  assert.equal(d.scripts.migrate, 'yarn db:migrate');
+  assert.deepEqual(d.package_scripts, ['test', 'lint', 'db:migrate']);
+  fs.rmSync(tmp, { recursive: true, force: true });
 });

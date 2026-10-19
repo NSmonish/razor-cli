@@ -172,7 +172,11 @@ function renderWorkflows(scan, flows) {
   const scripts = scan.scripts || {};
   if (Object.keys(scripts).length) {
     L.push('## Available scripts');
-    for (const [k, v] of Object.entries(scripts)) L.push(`- ${code(k)}: ${code(v)}`);
+    const sources = scan.script_sources || {};
+    for (const [k, v] of Object.entries(scripts)) {
+      const src = sources[k];
+      L.push(src ? `- ${k}: ${code(v)} (runs ${code(src.body)})` : `- ${code(k)}: ${code(v)}`);
+    }
     L.push('');
   }
   if (flows.buildSystem) {

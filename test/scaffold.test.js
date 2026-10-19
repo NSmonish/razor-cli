@@ -417,3 +417,36 @@ test('enrich prompt forbids invention and keeps the heading', () => {
   assert.ok(/only facts/i.test(p), 'prompt must restrict to given facts');
   assert.ok(p.includes('# Overview'), 'prompt should preserve the heading');
 });
+
+test('unknownScripts flags commands for scripts the repo does not define', () => {
+  const { unknownScripts } = require('../enricher.js');
+  const names = ['test', 'lint', 'db:migrate'];
+  assert.deepEqual(unknownScripts('Migrate: `npm run migrate`.', names), ['migrate']);
+  assert.deepEqual(unknownScripts('Run `npm run db:migrate`, then `npm test` and npm run lint.', names), []);
+  assert.deepEqual(unknownScripts('pnpm run build && yarn run-script lint', names), ['build']);
+});
+
+test('the check script and skills run package scripts through npm, by their real names', () => {
+  const { scanRepo } = require('../scanner.js');
+  const { emitScaffold } = require('../emitter.js');
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'razor-run-'));
+  fs.writeFileSync(path.join(tmp, 'package.json'), JSON.stringify({
+    dependencies: { express: '^4', sequelize: '^6' }, devDependencies: { jest: '^29' },
+    scripts: { test: 'jest', lint: 'eslint .', 'db:migrate': 'cd db && sequelize-cli db:migrate' },
+  }));
+  fs.writeFileSync(path.join(tmp, 'package-lock.json'), '{}');
+  fs.writeFileSync(path.join(tmp, '.eslintrc.json'), '{}');
+  fs.mkdirSync(path.join(tmp, 'db', 'migrations'), { recursive: true });
+  fs.writeFileSync(path.join(tmp, 'db', 'migrations', '001-init.js'), '');
+  const scan = scanRepo(tmp);
+  const flows = detectWorkflows(tmp);
+  const out = path.join(tmp, '.agent');
+  emitScaffold(scan, flows, planScaffold(scan, flows), out);
+  const check = fs.readFileSync(path.join(out, 'scripts', 'check.sh'), 'utf8');
+  assert.match(check, /^npm run lint$/m);
+  assert.match(check, /^npm test$/m);
+  const mig = fs.readFileSync(path.join(out, 'skills', 'db-migrations', 'SKILL.md'), 'utf8');
+  assert.ok(mig.includes('`npm run db:migrate`'), mig);
+  assert.ok(!/npm run migrate\b/.test(fs.readFileSync(path.join(out, 'workflows.md'), 'utf8')));
+  fs.rmSync(tmp, { recursive: true, force: true });
+});
