@@ -1,0 +1,22 @@
+{
+  "id": "o2-outline-tsvector-limit",
+  "repo": "outline",
+  "commit": "cced36fc01b3aacf390e88b58422ae1d3bbdb367",
+  "source_fix": "outline/outline@18a7099e8f (2026-09-21, #13832): fix: Document search trigger fails when tsvector exceeds size limit",
+  "tags": ["real-fix", "large-repo", "hard", "migration", "sql"],
+  "prompt": "prompt.md",
+  "solution": "solution.patch",
+  "supp_files": {
+    "server/models/Document.test.ts": "supp/server/models/Document.test.ts"
+  },
+  "regression_paths": ["server/models/Document.test.ts", "server/models/SearchHelper.test.ts"],
+  "acceptance": [
+    { "id": "AC1", "visibility": "shown", "source": "orig",
+      "desc": "a document whose search vector exceeds the tsvector limit saves; its title, previous titles and the start of its text are indexed",
+      "file": "server/models/Document.test.ts",
+      "title": "#save > should index text whose search vector exceeds the tsvector limit", "null_expect": "fail" },
+    { "id": "AC2", "visibility": "hidden", "source": "cmd",
+      "desc": "the fix ships as a new migration; no existing migration file is modified or deleted (guard)",
+      "cmd": ["git", "diff", "--quiet", "--diff-filter=MD", "HEAD", "--", "server/migrations"], "null_expect": "pass" }
+  ]
+}

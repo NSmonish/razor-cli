@@ -3,7 +3,7 @@ name: steering
 kind: doc
 description: enough conventions to be worth stating
 version: 1
-generated: 2026-10-12
+generated: 2026-10-19
 razor_format: 1.0
 ---
 

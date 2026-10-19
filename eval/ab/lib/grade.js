@@ -2,7 +2,7 @@
 // suite once, and score every acceptance criterion from the runner's JSON.
 const fs = require('fs');
 const path = require('path');
-const { sh, run } = require('./util');
+const { sh, run, repoEnv } = require('./util');
 const { hook } = require('./workspace');
 
 // what the agent changed relative to the initial commit (pack files are part
@@ -118,6 +118,35 @@ async function runJest(repo, ws, outFile) {
   };
 }
 
+// vitest --reporter=json (jest-shaped) → Map("rel/file.test.ts::Describe > title" -> status).
+// Titles include their describe blocks: suites reuse short titles ("should succeed").
+async function runVitest(task, ws, outFile) {
+  const repo = task.repoConfig;
+  const files = testFiles(task, ws).filter((rel) => fs.existsSync(path.join(ws, rel)));
+  const env = { ...repoEnv(repo), TZ: 'UTC' };
+  delete env.CI;
+  const res = await run('yarn', ['vitest', 'run', '--reporter=json', `--outputFile=${outFile}`, ...files], {
+    cwd: ws,
+    env,
+    timeoutMs: (repo.test_timeout_s || 600) * 1000,
+  });
+  if (res.timedOut) throw Object.assign(new Error('test run hit its wall-clock ceiling'), { failureClass: 'grader_timeout' });
+  if (!fs.existsSync(outFile)) throw Object.assign(new Error(`vitest wrote no JSON (exit ${res.code})`), { failureClass: 'grader_error' });
+  const report = JSON.parse(fs.readFileSync(outFile, 'utf8'));
+  const statuses = new Map();
+  const brokenSuites = [];
+  const wsReal = fs.realpathSync(ws);
+  for (const suite of report.testResults) {
+    const rel = path.relative(wsReal, suite.name);
+    if (suite.status === 'failed' && !suite.assertionResults.length) brokenSuites.push(rel);
+    for (const a of suite.assertionResults) statuses.set(key(rel, [...a.ancestorTitles, a.title].join(' > ')), a.status);
+  }
+  return {
+    statuses,
+    summary: { passed: report.numPassedTests, failed: report.numFailedTests, total: report.numTotalTests, broken_suites: brokenSuites },
+  };
+}
+
 // an AC is either a test (file + title in the runner's report) or a command
 // whose exit code decides (source: "cmd", e.g. "existing migration untouched")
 async function scoreAcceptance(task, ws, statuses) {
@@ -148,7 +177,9 @@ async function gradeWorkspace(task, ws, base, { oraclePassing = null, outDir, sl
   const outFile = path.join(outDir || ws, `jest-${task.id}-${process.pid}-${Date.now()}.json`);
   const runner = task.repoConfig.test_runner || 'jest';
   const { statuses, summary } =
-    runner === 'node-test' ? await runNodeTest(task, ws, outDir || ws) : await runJest(task.repoConfig, ws, outFile);
+    runner === 'node-test' ? await runNodeTest(task, ws, outDir || ws)
+      : runner === 'vitest' ? await runVitest(task, ws, outFile)
+        : await runJest(task.repoConfig, ws, outFile);
   const { ac, detail } = await scoreAcceptance(task, ws, statuses);
 
   let regressions = null;

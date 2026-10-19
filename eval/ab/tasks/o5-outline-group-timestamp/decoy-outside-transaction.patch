@@ -1,0 +1,107 @@
+diff --git a/server/models/GroupUser.ts b/server/models/GroupUser.ts
+index fff027708..22e3e690d 100644
+--- a/server/models/GroupUser.ts
++++ b/server/models/GroupUser.ts
+@@ -1,4 +1,10 @@
+-import type { InferAttributes, InferCreationAttributes } from "sequelize";
++import type {
++  CreateOptions,
++  DestroyOptions,
++  InferAttributes,
++  InferCreationAttributes,
++  Transaction,
++} from "sequelize";
+ import {
+   AfterCreate,
+   AfterDestroy,
+@@ -68,15 +74,52 @@ class GroupUser extends Model<
+ 
+   // hooks
+ 
++  /**
++   * Updates the group timestamp and invalidates document membership IDs after a user joins.
++   *
++   * @param model - the new group membership.
++   * @param options - the creation options, including the transaction.
++   * @returns a promise that resolves when the updates are complete.
++   */
+   @AfterCreate
+-  static async invalidateDocumentIdsAfterCreate(model: GroupUser) {
++  static async handleMembershipCreated(
++    model: GroupUser,
++    options: CreateOptions<GroupUser>
++  ) {
++    await this.touchGroup(model, options.transaction);
+     await Document.invalidateMembershipDocumentIds([model.userId]);
+   }
+ 
++  /**
++   * Updates the group timestamp and invalidates document membership IDs after a user leaves.
++   *
++   * @param model - the removed group membership.
++   * @param options - the deletion options, including the transaction.
++   * @returns a promise that resolves when the updates are complete.
++   */
+   @AfterDestroy
+-  static async invalidateDocumentIdsAfterDestroy(model: GroupUser) {
++  static async handleMembershipDestroyed(
++    model: GroupUser,
++    options: DestroyOptions<GroupUser>
++  ) {
++    await this.touchGroup(model, options.transaction);
+     await Document.invalidateMembershipDocumentIds([model.userId]);
+   }
++
++  private static async touchGroup(
++    model: GroupUser,
++    transaction?: Transaction | null
++  ) {
++    // Sequelize skips bulk updates when updatedAt is the only value.
++    await model.sequelize
++      .getQueryInterface()
++      .bulkUpdate(
++        Group.getTableName(),
++        { updatedAt: new Date() },
++        { id: model.groupId },
++        {}
++      );
++  }
+ }
+ 
+ export default GroupUser;
+diff --git a/server/routes/api/groups/groups.ts b/server/routes/api/groups/groups.ts
+index 6fc322f3b..80110d4fb 100644
+--- a/server/routes/api/groups/groups.ts
++++ b/server/routes/api/groups/groups.ts
+@@ -473,7 +473,7 @@ router.post(
+ 
+     const userPermission = permission;
+ 
+-    const [groupUser] = await GroupUser.findOrCreateWithCtx(
++    const [groupUser, created] = await GroupUser.findOrCreateWithCtx(
+       ctx,
+       {
+         where: {
+@@ -496,6 +496,10 @@ router.post(
+       await groupUser.updateWithCtx(ctx, { permission: userPermission });
+     }
+ 
++    if (created) {
++      await group.reload({ transaction });
++    }
++
+     groupUser.user = user;
+ 
+     ctx.body = {
+@@ -552,7 +556,10 @@ router.post(
+       lock: transaction.LOCK.UPDATE,
+     });
+ 
+-    await groupUser?.destroyWithCtx(ctx, { name: "remove_user" });
++    if (groupUser) {
++      await groupUser.destroyWithCtx(ctx, { name: "remove_user" });
++      await group.reload({ transaction });
++    }
+ 
+     ctx.body = {
+       data: {

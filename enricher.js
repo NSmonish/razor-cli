@@ -28,6 +28,7 @@ Below is (1) a JSON scan of the repository and (2) a DRAFT of this section built
 Rewrite the DRAFT so it reads clearly and helps a coding agent, following these strict rules:
 - Use ONLY facts present in the scan JSON or the draft. Do NOT invent commands, file names, libraries, or conventions.
 - Keep every concrete fact from the draft (stack, commands, directories, env var names, config files). You may rephrase and reorganize, not drop facts.
+- Write commands exactly as the draft writes them (e.g. \`npm run db:migrate\`). Never build a command from a JSON key name.
 - Keep it concise and skimmable. Markdown only. Keep the top-level "# ${docName.charAt(0).toUpperCase() + docName.slice(1)}" heading.
 - Do not add praise, intros, or conclusions. Output ONLY the markdown for this section.
 
@@ -36,6 +37,18 @@ ${scanJson}
 
 DRAFT:
 ${draft}`;
+}
+
+// scripts a rewrite runs (`npm run x`, `pnpm run x`, `yarn run x`) that the
+// repo doesn't define. The scan keys scripts by role, so a model reading
+// `migrate: ...` will happily write `npm run migrate` for a db:migrate script.
+function unknownScripts(text, scriptNames) {
+  const out = [];
+  for (const m of text.matchAll(/\b(?:npm|pnpm|yarn)\s+(?:run|run-script)\s+([\w:.@/-]+)/g)) {
+    const name = m[1].replace(/[.:]+$/, '');
+    if (!scriptNames.includes(name)) out.push(name);
+  }
+  return out;
 }
 
 // enrich a single doc's markdown. returns improved markdown, or the original
@@ -72,11 +85,22 @@ async function enrichDocs(drafts, scanJson, opts = {}) {
   const modelName = process.env.GEMINI_MODEL || opts.model || 'gemini-3.5-flash-lite';
   const model = genAI.getGenerativeModel({ model: modelName });
 
+  // scans from before package_scripts existed skip the script check
+  let scriptNames = null;
+  try {
+    const names = JSON.parse(scanJson).package_scripts;
+    if (Array.isArray(names)) scriptNames = names;
+  } catch (_) {
+    // not JSON: no script check
+  }
+
   const out = {};
   let usedLLM = false;
   for (const [name, draft] of Object.entries(drafts)) {
     if (isProseDoc(name)) {
-      const improved = await enrichDoc(model, name, draft, scanJson);
+      let improved = await enrichDoc(model, name, draft, scanJson);
+      // a rewrite that invents a script is worse than the plain draft
+      if (scriptNames && unknownScripts(improved, scriptNames).length) improved = draft;
       out[name] = improved;
       if (improved !== draft) usedLLM = true;
     } else {
@@ -86,4 +110,4 @@ async function enrichDocs(drafts, scanJson, opts = {}) {
   return { docs: out, usedLLM };
 }
 
-module.exports = { enrichDocs, isProseDoc, buildEnrichPrompt, hasRealKey };
+module.exports = { enrichDocs, isProseDoc, buildEnrichPrompt, hasRealKey, unknownScripts };

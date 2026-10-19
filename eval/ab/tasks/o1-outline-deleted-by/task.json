@@ -1,0 +1,152 @@
+{
+  "id": "o1-outline-deleted-by",
+  "repo": "outline",
+  "commit": "1ca833571745d4cc9b8a7bc585f4c6fb3e8981da",
+  "source_fix": "outline/outline@def3a42752 (2026-08-22, #13484): feat: Record who deleted a document",
+  "tags": [
+    "real-fix",
+    "hidden-acs",
+    "large-repo",
+    "hard",
+    "migration",
+    "multi-layer"
+  ],
+  "prompt": "prompt.md",
+  "solution": "solution.patch",
+  "supp_files": {
+    "server/models/base/ParanoidModel.test.ts": "supp/server/models/base/ParanoidModel.test.ts",
+    "server/presenters/document.test.ts": "supp/server/presenters/document.test.ts",
+    "server/routes/api/documents/documents.test.ts": "supp/server/routes/api/documents/documents.test.ts"
+  },
+  "supp_note": "server/models/Collection.test.ts is not used: the fix changed Collection#deleteDocument's signature (an internal refactor the issue does not imply) and the post-fix file only follows that.",
+  "regression_paths": [
+    "server/routes/api/documents/documents.test.ts",
+    "server/models/Document.test.ts"
+  ],
+  "acceptance": [
+    {
+      "id": "AC1",
+      "visibility": "shown",
+      "source": "orig",
+      "desc": "deleting a tree records the deleter on nested documents and keeps lastModifiedById",
+      "file": "server/routes/api/documents/documents.test.ts",
+      "title": "#documents.deleted > should record the deleting user on nested documents",
+      "null_expect": "fail"
+    },
+    {
+      "id": "AC2",
+      "visibility": "shown",
+      "source": "orig",
+      "desc": "documents.info presents deletedBy for a deleted document",
+      "file": "server/routes/api/documents/documents.test.ts",
+      "title": "#documents.deleted > should present the deleting user on a single document",
+      "null_expect": "fail"
+    },
+    {
+      "id": "AC3",
+      "visibility": "shown",
+      "source": "orig",
+      "desc": "no deletedBy on an active document (guard)",
+      "file": "server/routes/api/documents/documents.test.ts",
+      "title": "#documents.deleted > should not present a deleting user on an active document",
+      "null_expect": "pass"
+    },
+    {
+      "id": "AC4",
+      "visibility": "shown",
+      "source": "orig",
+      "desc": "soft delete with an authenticated context records deletedById",
+      "file": "server/models/base/ParanoidModel.test.ts",
+      "title": "ParanoidModel > deletedById > should record the acting user on destroy",
+      "null_expect": "fail"
+    },
+    {
+      "id": "AC5",
+      "visibility": "shown",
+      "source": "orig",
+      "desc": "restore clears deletedById",
+      "file": "server/models/base/ParanoidModel.test.ts",
+      "title": "ParanoidModel > deletedById > should clear the recorded user on restore",
+      "null_expect": "fail"
+    },
+    {
+      "id": "AC6",
+      "visibility": "hidden",
+      "source": "orig",
+      "desc": "a delete without an acting user leaves deletedById null rather than failing",
+      "file": "server/models/base/ParanoidModel.test.ts",
+      "title": "ParanoidModel > deletedById > should record nothing when the context is unauthenticated",
+      "null_expect": "fail",
+      "leak_strings": [
+        "unauthenticated",
+        "without a user"
+      ]
+    },
+    {
+      "id": "AC7",
+      "visibility": "hidden",
+      "source": "orig",
+      "desc": "soft-deletable models without the column still delete (guard)",
+      "file": "server/models/base/ParanoidModel.test.ts",
+      "title": "ParanoidModel > deletedById > should ignore models without the column",
+      "null_expect": "pass"
+    },
+    {
+      "id": "AC8",
+      "visibility": "hidden",
+      "source": "orig",
+      "desc": "presenting a page of trashed documents loads the deleting users in one query, not one per document",
+      "file": "server/presenters/document.test.ts",
+      "title": "presentDocuments > deletedBy > should resolve the deleting user in a single query",
+      "null_expect": "fail",
+      "leak_strings": [
+        "single query",
+        "N+1",
+        "one query",
+        "batch"
+      ]
+    },
+    {
+      "id": "AC9",
+      "visibility": "hidden",
+      "source": "orig",
+      "desc": "an eager-loaded deletedBy is not overwritten when presenting in bulk",
+      "file": "server/presenters/document.test.ts",
+      "title": "presentDocuments > deletedBy > should not overwrite an already loaded deleting user",
+      "null_expect": "fail",
+      "leak_strings": [
+        "eager",
+        "already loaded"
+      ]
+    },
+    {
+      "id": "AC10",
+      "visibility": "hidden",
+      "source": "cmd",
+      "desc": "the column ships as a new migration; no existing migration file is modified or deleted (guard)",
+      "cmd": [
+        "git",
+        "diff",
+        "--quiet",
+        "--diff-filter=MD",
+        "HEAD",
+        "--",
+        "server/migrations"
+      ],
+      "null_expect": "pass"
+    }
+  ],
+  "decoys": [
+    {
+      "patch": "decoy-n-plus-one.patch",
+      "desc": "the full fix except the batched user lookup: each presented document fetches its deleting user on its own",
+      "expect": {
+        "AC1": "pass",
+        "AC2": "pass",
+        "AC4": "pass",
+        "AC5": "pass",
+        "AC8": "fail"
+      }
+    }
+  ]
+}

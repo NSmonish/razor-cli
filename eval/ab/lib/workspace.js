@@ -7,7 +7,7 @@
 // in no object, branch, or reflog the agent could find.
 const fs = require('fs');
 const path = require('path');
-const { AB_DIR, RAZOR_ROOT, WORK_DIR, readJSON, sh, cloneTree, rmrf, patchedFiles, log } = require('./util');
+const { AB_DIR, RAZOR_ROOT, WORK_DIR, readJSON, sh, cloneTree, rmrf, patchedFiles, log, repoEnv } = require('./util');
 
 const MODES = ['oracle', 'null', 'naive', 'razor'];
 
@@ -50,7 +50,7 @@ function ensureBase(repo, commit = repo.commit) {
   sh('git', ['checkout', '--quiet', commit], { cwd: base });
   for (const cmd of repo.install || []) {
     log(`cache: ${cmd.join(' ')}`);
-    sh(cmd[0], cmd.slice(1), { cwd: base });
+    sh(cmd[0], cmd.slice(1), { cwd: base, env: repoEnv(repo), timeoutMs: 30 * 60_000 });
   }
   fs.writeFileSync(marker, new Date().toISOString() + '\n');
   return base;
@@ -58,7 +58,7 @@ function ensureBase(repo, commit = repo.commit) {
 
 function hook(repo, cmd, ws, slot) {
   if (!repo.hooks) return;
-  sh('bash', [path.join(repo.dir, repo.hooks), cmd, ws, String(slot)], { timeoutMs: 5 * 60_000 });
+  sh('bash', [path.join(repo.dir, repo.hooks), cmd, ws, String(slot)], { env: repoEnv(repo), timeoutMs: 10 * 60_000 });
 }
 
 // break/hide are optional: a real-issue task has neither (the fix PR's tests
@@ -68,9 +68,41 @@ function applyPatch(ws, patchFile) {
   sh('git', ['apply', '--whitespace=nowarn', patchFile], { cwd: ws });
 }
 
+// the razor arm's pack: the repo's pinned pack (repo.json `razor_pack`, a
+// directory relative to the razor-cli root) when it has one, else generated
+function razorPackDir(repo) {
+  return repo.razor_pack ? path.join(RAZOR_ROOT, repo.razor_pack) : null;
+}
+
+// every file under a pack directory, as sorted relative paths
+function listPack(dir) {
+  return fs
+    .readdirSync(dir, { recursive: true })
+    .map(String)
+    .filter((f) => fs.statSync(path.join(dir, f)).isFile())
+    .sort();
+}
+
+// copy a pinned pack into the workspace root. A pack file must not replace a
+// repo file, or the razor arm would also differ in the repo itself.
+function installPinnedPack(ws, dir) {
+  const files = listPack(dir);
+  if (!files.length) throw new Error(`razor pack ${dir} is empty`);
+  const clash = files.filter((f) => fs.existsSync(path.join(ws, f)));
+  if (clash.length) throw new Error(`razor pack would overwrite repo files: ${clash.join(', ')}`);
+  for (const f of files) {
+    fs.mkdirSync(path.dirname(path.join(ws, f)), { recursive: true });
+    fs.copyFileSync(path.join(dir, f), path.join(ws, f));
+  }
+  return files;
+}
+
+// RAZOR_NO_LLM=1 keeps a generated pack deterministic (scaffold has no
+// --offline flag any more; with a key it would call the LLM)
 function razorScaffold(ws) {
-  const res = sh('node', [path.join(RAZOR_ROOT, 'index.js'), 'scaffold', ws, '-o', ws, '--target', 'claude', '--offline'], {
+  const res = sh('node', [path.join(RAZOR_ROOT, 'index.js'), 'scaffold', ws, '-o', ws, '--target', 'claude'], {
     cwd: RAZOR_ROOT,
+    env: { ...process.env, RAZOR_NO_LLM: '1' },
   });
   // the CLI lists written files as two-space-indented relative paths after "Context pack written"
   const out = res.stdout.split('Context pack written')[1] || '';
@@ -108,7 +140,10 @@ function prepareWorkspace(task, mode, ws, slot) {
   hook(repo, 'patch', ws, slot);
 
   let packFiles = [];
-  if (mode === 'razor') packFiles = razorScaffold(ws);
+  if (mode === 'razor') {
+    const dir = razorPackDir(repo);
+    packFiles = dir ? installPinnedPack(ws, dir) : razorScaffold(ws);
+  }
 
   sh('git', ['init', '--quiet', '-b', 'main'], { cwd: ws });
   sh('git', ['add', '-A'], { cwd: ws });
@@ -123,4 +158,4 @@ function teardownWorkspace(task, ws, slot, { keep } = {}) {
   if (!keep) rmrf(ws);
 }
 
-module.exports = { loadTasks, loadRepo, ensureBase, prepareWorkspace, teardownWorkspace, hook };
+module.exports = { loadTasks, loadRepo, ensureBase, prepareWorkspace, teardownWorkspace, hook, razorPackDir, listPack, installPinnedPack };

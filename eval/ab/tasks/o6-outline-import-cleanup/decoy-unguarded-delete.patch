@@ -1,0 +1,126 @@
+diff --git a/server/queues/processors/ImportsProcessor.ts b/server/queues/processors/ImportsProcessor.ts
+index c1df1921a..7afb86766 100644
+--- a/server/queues/processors/ImportsProcessor.ts
++++ b/server/queues/processors/ImportsProcessor.ts
+@@ -59,8 +59,10 @@ export default abstract class ImportsProcessor<
+    * @param event The import event
+    */
+   public async perform(event: ImportEvent) {
++    let sourceAttachment: Attachment | null = null;
++
+     try {
+-      await sequelize.transaction(async (transaction) => {
++      sourceAttachment = await sequelize.transaction(async (transaction) => {
+         const importModel = await Import.findByPk<Import<T>>(event.modelId, {
+           rejectOnEmpty: true,
+           paranoid: false,
+@@ -73,19 +75,23 @@ export default abstract class ImportsProcessor<
+           importModel.state === ImportState.Errored ||
+           importModel.state === ImportState.Canceled
+         ) {
+-          return;
++          return null;
+         }
+ 
+         switch (event.name) {
+           case "imports.create":
+-            return this.onCreation(importModel, transaction);
++            await this.onCreation(importModel, transaction);
++            return null;
+ 
+           case "imports.processed":
+             return this.onProcessed(importModel, transaction);
+ 
+           case "imports.delete":
+-            return this.onDeletion(importModel, event, transaction);
++            await this.onDeletion(importModel, event, transaction);
++            return null;
+         }
++
++        return null;
+       });
+     } catch (err) {
+       if (event.name !== "imports.delete" && err instanceof Error) {
+@@ -99,6 +105,12 @@ export default abstract class ImportsProcessor<
+ 
+       throw err; // throw error for retry.
+     }
++
++    if (!sourceAttachment) {
++      return;
++    }
++
++    await sourceAttachment.destroy();
+   }
+ 
+   public async onFailed(event: ImportEvent) {
+@@ -167,9 +179,12 @@ export default abstract class ImportsProcessor<
+    *
+    * @param importModel Import model associated with the event.
+    * @param transaction Sequelize transaction.
+-   * @returns Promise that resolves when mapping and persistence is completed.
++   * @returns Source attachment to delete after the transaction commits.
+    */
+-  private async onProcessed(importModel: Import<T>, transaction: Transaction) {
++  private async onProcessed(
++    importModel: Import<T>,
++    transaction: Transaction
++  ): Promise<Attachment | null> {
+     try {
+       const { collections } = await this.createCollectionsAndDocuments({
+         importModel,
+@@ -203,7 +218,9 @@ export default abstract class ImportsProcessor<
+         await collection.save({ silent: true, transaction });
+       }
+ 
++      const storageKey = importModel.scratch?.storageKey;
+       importModel.state = ImportState.Completed;
++      importModel.scratch = null;
+       importModel.error = null; // unset any error from previous attempts.
+       await importModel.saveWithCtx(
+         createContext({
+@@ -211,6 +228,18 @@ export default abstract class ImportsProcessor<
+           transaction,
+         })
+       );
++
++      if (storageKey) {
++        return Attachment.findOne({
++          where: {
++            key: storageKey,
++            teamId: importModel.teamId,
++          },
++          transaction,
++        });
++      }
++
++      return null;
+     } catch (err) {
+       if (err instanceof UniqueConstraintError) {
+         Logger.error(
+diff --git a/server/queues/tasks/APIImportTask.ts b/server/queues/tasks/APIImportTask.ts
+index bfdd0a3b7..455bd163e 100644
+--- a/server/queues/tasks/APIImportTask.ts
++++ b/server/queues/tasks/APIImportTask.ts
+@@ -259,8 +259,6 @@ export default abstract class APIImportTask<
+     await sequelize.transaction(async (transaction) => {
+       const associatedImport = importTask.import;
+       associatedImport.state = ImportState.Processed;
+-      // Release any cross-phase scratch state — the import is done with it.
+-      associatedImport.scratch = null;
+       await associatedImport.saveWithCtx(
+         createContext({
+           user: associatedImport.createdBy,
+diff --git a/shared/schema.ts b/shared/schema.ts
+index e5a00d209..2543e6b41 100644
+--- a/shared/schema.ts
++++ b/shared/schema.ts
+@@ -129,7 +129,7 @@ export interface JSONImportScratch {
+  * Per-importer scratch shape stored on `Import.scratch`. Holds cross-phase
+  * state that the importer needs between bootstrap and completion but that
+  * isn't part of any single task's input. Cleared when the import flips to
+- * `Processed`.
++ * `Completed`.
+  */
+ export type ImportScratch<T extends ImportableIntegrationService> = T extends
+   | IntegrationService.Markdown

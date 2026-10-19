@@ -1,0 +1,239 @@
+diff --git a/server/models/Collection.ts b/server/models/Collection.ts
+index bb0b2858d..2907a0a52 100644
+--- a/server/models/Collection.ts
++++ b/server/models/Collection.ts
+@@ -672,6 +672,13 @@ class Collection extends ParanoidModel<
+     options: FindOptions<Collection> & AdditionalFindOptions = {}
+   ): Promise<Collection | null> {
+     if (typeof id !== "string") {
++      if (options.rejectOnEmpty) {
++        throw options.rejectOnEmpty instanceof Error
++          ? options.rejectOnEmpty
++          : new EmptyResultError(
++              `Collection doesn't exist with id: ${String(id)}`
++            );
++      }
+       return null;
+     }
+ 
+@@ -699,44 +706,34 @@ class Collection extends ParanoidModel<
+ 
+     const scope = this.scope(scopes);
+ 
++    let collection: Collection | null = null;
++    const match = id.match(UrlHelper.SLUG_URL_REGEX);
++
+     if (isUUID(id)) {
+-      const collection = await scope.findOne({
++      collection = await scope.findOne({
+         ...rest,
+         where: {
+           id,
+         },
+         rejectOnEmpty: false,
+       });
+-
+-      if (!collection && rest.rejectOnEmpty) {
+-        throw rest.rejectOnEmpty instanceof Error
+-          ? rest.rejectOnEmpty
+-          : new EmptyResultError(`Collection doesn't exist with id: ${id}`);
+-      }
+-
+-      return collection;
+-    }
+-
+-    const match = id.match(UrlHelper.SLUG_URL_REGEX);
+-    if (match) {
+-      const collection = await scope.findOne({
++    } else if (match) {
++      collection = await scope.findOne({
+         ...rest,
+         where: {
+           urlId: match[1],
+         },
+         rejectOnEmpty: false,
+       });
++    }
+ 
+-      if (!collection && rest.rejectOnEmpty) {
+-        throw rest.rejectOnEmpty instanceof Error
+-          ? rest.rejectOnEmpty
+-          : new EmptyResultError(`Collection doesn't exist with id: ${id}`);
+-      }
+-
+-      return collection;
++    if (!collection && rest.rejectOnEmpty) {
++      throw rest.rejectOnEmpty instanceof Error
++        ? rest.rejectOnEmpty
++        : new EmptyResultError(`Collection doesn't exist with id: ${id}`);
+     }
+ 
+-    return null;
++    return collection;
+   }
+ 
+   /**
+diff --git a/server/models/Document.ts b/server/models/Document.ts
+index af5f7d273..75ab53fd7 100644
+--- a/server/models/Document.ts
++++ b/server/models/Document.ts
+@@ -923,6 +923,13 @@ class Document extends ArchivableModel<
+       AdditionalFindOptions = {}
+   ): Promise<Document | null> {
+     if (typeof id !== "string") {
++      if (options.rejectOnEmpty) {
++        throw options.rejectOnEmpty instanceof Error
++          ? options.rejectOnEmpty
++          : new EmptyResultError(
++              `Document doesn't exist with id: ${String(id)}`
++            );
++      }
+       return null;
+     }
+ 
+@@ -956,44 +963,34 @@ class Document extends ArchivableModel<
+       },
+     ]);
+ 
++    let document: Document | null = null;
++    const match = id.match(UrlHelper.SLUG_URL_REGEX);
++
+     if (isUUID(id)) {
+-      const document = await scope.findOne({
++      document = await scope.findOne({
+         ...rest,
+         where: {
+           id,
+         },
+         rejectOnEmpty: false,
+       });
+-
+-      if (!document && rest.rejectOnEmpty) {
+-        throw rest.rejectOnEmpty instanceof Error
+-          ? rest.rejectOnEmpty
+-          : new EmptyResultError(`Document doesn't exist with id: ${id}`);
+-      }
+-
+-      return document;
+-    }
+-
+-    const match = id.match(UrlHelper.SLUG_URL_REGEX);
+-    if (match) {
+-      const document = await scope.findOne({
++    } else if (match) {
++      document = await scope.findOne({
+         ...rest,
+         where: {
+           urlId: match[1],
+         },
+         rejectOnEmpty: false,
+       });
++    }
+ 
+-      if (!document && rest.rejectOnEmpty) {
+-        throw rest.rejectOnEmpty instanceof Error
+-          ? rest.rejectOnEmpty
+-          : new EmptyResultError(`Document doesn't exist with id: ${id}`);
+-      }
+-
+-      return document;
++    if (!document && rest.rejectOnEmpty) {
++      throw rest.rejectOnEmpty instanceof Error
++        ? rest.rejectOnEmpty
++        : new EmptyResultError(`Document doesn't exist with id: ${id}`);
+     }
+ 
+-    return null;
++    return document;
+   }
+ 
+   /**
+diff --git a/server/models/FileOperation.ts b/server/models/FileOperation.ts
+index 824c13f1d..b58df8f6f 100644
+--- a/server/models/FileOperation.ts
++++ b/server/models/FileOperation.ts
+@@ -213,6 +213,13 @@ class FileOperation extends ParanoidModel<
+     options: FindOptions<FileOperation> & AdditionalFindOptions = {}
+   ): Promise<FileOperation | null> {
+     if (typeof id !== "string") {
++      if (options.rejectOnEmpty) {
++        throw options.rejectOnEmpty instanceof Error
++          ? options.rejectOnEmpty
++          : new EmptyResultError(
++              `File operation doesn't exist with id: ${String(id)}`
++            );
++      }
+       return null;
+     }
+ 
+diff --git a/server/models/Template.ts b/server/models/Template.ts
+index 5c1091ef4..7a72bd3dd 100644
+--- a/server/models/Template.ts
++++ b/server/models/Template.ts
+@@ -244,6 +244,13 @@ class Template extends ParanoidModel<
+       AdditionalFindOptions = {}
+   ): Promise<Template | null> {
+     if (typeof id !== "string") {
++      if (options.rejectOnEmpty) {
++        throw options.rejectOnEmpty instanceof Error
++          ? options.rejectOnEmpty
++          : new EmptyResultError(
++              `Template doesn't exist with id: ${String(id)}`
++            );
++      }
+       return null;
+     }
+ 
+@@ -258,40 +265,34 @@ class Template extends ParanoidModel<
+       },
+     ]);
+ 
++    let template: Template | null = null;
++    const match = id.match(UrlHelper.SLUG_URL_REGEX);
++
+     if (isUUID(id)) {
+-      const template = await scope.findOne({
++      template = await scope.findOne({
+         where: {
+           id,
+         },
+         ...rest,
+         rejectOnEmpty: false,
+       });
+-
+-      if (!template && rest.rejectOnEmpty) {
+-        throw new EmptyResultError(`Template doesn't exist with id: ${id}`);
+-      }
+-
+-      return template;
+-    }
+-
+-    const match = id.match(UrlHelper.SLUG_URL_REGEX);
+-    if (match) {
+-      const template = await scope.findOne({
++    } else if (match) {
++      template = await scope.findOne({
+         where: {
+           urlId: match[1],
+         },
+         ...rest,
+         rejectOnEmpty: false,
+       });
++    }
+ 
+-      if (!template && rest.rejectOnEmpty) {
+-        throw new EmptyResultError(`Template doesn't exist with id: ${id}`);
+-      }
+-
+-      return template;
++    if (!template && rest.rejectOnEmpty) {
++      throw rest.rejectOnEmpty instanceof Error
++        ? rest.rejectOnEmpty
++        : new EmptyResultError(`Template doesn't exist with id: ${id}`);
+     }
+ 
+-    return null;
++    return template;
+   }
+ }
+ 

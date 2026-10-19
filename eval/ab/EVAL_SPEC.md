@@ -7,7 +7,7 @@ Each task runs twice, in parallel, on two identical disposable copies of the rep
 
 | Arm | What the agent gets |
 |---|---|
-| `razor` | repo + `razor scaffold --target claude --offline` output (`AGENTS.md` at root, skills in `.claude/skills/`, docs, `scripts/check.sh`) |
+| `razor` | repo + a Razor pack in the Claude Code layout (`AGENTS.md` at root, skills in `.claude/skills/`, docs, `skills.index.json`, `scripts/check.sh`). Pinned per repo or generated, see §11 |
 | `naive` | repo only |
 
 Everything else is identical: same prompt, model, flags, Claude Code version,
@@ -393,3 +393,149 @@ Notes:
   `removeHeader` throws: the hijacked handler swallows the assertion error and
   the test passes after an 8-second hang.
 
+## 11. Pinned worked-example pack (razor arm, nodejs-testing-best-practices)
+
+**Why.** `scaffold` no longer has `--offline` (3caa34a): it always calls the
+LLM when a key is present, for skill discovery and the prose pass, and falls
+back to deterministic output otherwise. A pack generated per workspace would
+then depend on whether the harness machine has a key and on the LLM's output
+that day. So a repo can pin its pack in `repo.json` (`razor_pack`), and the
+razor arm gets those files copied into the repo root, unchanged.
+
+nodejs-testing-best-practices pins
+`examples/nodejs-testing-best-practices/pack`: the current scaffold output
+with the LLM prose pass, which is what a user running Razor gets now. Repos
+without `razor_pack` (fastify) still generate a pack, with `RAZOR_NO_LLM=1`.
+
+**Recorded.** `meta.razor_pack` holds, per repo, the pack's source path, file
+count and content hash (or `generated`). A run refuses to resume with a
+different pack unless `--force`. Every run in `results/` before this section
+generated the pack in each workspace with `scaffold --offline`.
+On nodejs-testing-best-practices that pack had 2 skills (`run-tests`,
+`lint-fix`; no `code-push`, because the workspace has no git remote) and no
+`db-migrations`. Those runs aren't comparable to runs with the pinned pack,
+except as the "before" side: `sonnet-hint` ran t1–t5 with the old pack and the
+hint (Sonnet, medium effort, 1 rep, no verification instruction), so a run with
+the same settings isolates the pack change:
+
+```bash
+node eval/ab/run.js run --name sonnet-hint-pinned --model claude-sonnet-5-5 \
+  --tasks t1-premium-discount,t2-delete-order,t3-user-service-timeout,t4-order-status-lifecycle,t5-order-listing \
+  --no-verify-instruction
+```
+
+The Claude Code version will differ from `sonnet-hint`'s (2.1.296), and one rep
+per arm is an anecdote, not evidence (§6).
+
+**What's new in the pack, and the task that exercises it.**
+
+| Pack change | Exercised by | What to look for |
+|---|---|---|
+| `db-migrations` skill (nested `data-access/migrations/` and `db:migrate` now detected) | t4 (needs a new `status` column; AC8 reads it with raw SQL, AC9 forbids editing the existing migration, grading re-runs every migration from scratch) | `pack.skills_used` includes `db-migrations`; AC8/AC9 on the razor arm vs naive |
+| `local-env` skill (nested `docker-compose.yml` now detected) | all tasks, weakly: the harness already starts Postgres for both arms | whether the agent tries to start its own stack (time, failed Bash calls) |
+| LLM-enriched `overview` / `architecture` / `workflows` / `steering` | all tasks | `pack.files_read`, exploration before first edit |
+| `skills.index.json` routes 5 skills | all tasks | `pack.skills_used` per task |
+
+`pack.skills_used` (new metric) is the razor-arm skills the agent either
+invoked with the Skill tool or read any file of (`SKILL.md`, `reference.md`),
+by Read or by a Bash command naming it.
+
+**Known defects in the pinned pack, kept on purpose** so the eval measures what
+Razor actually produces (details in the example's README):
+
+- The prose docs say `npm run migrate`. The script is `npm run db:migrate`, so
+  that command fails with `Missing script: "migrate"`. Most relevant to t4.
+- `scripts/check.sh` and the skills call `eslint` / `jest` / `sequelize-cli`
+  bare. They aren't on `PATH`, so `bash scripts/check.sh` fails with
+  `eslint: command not found`. `eslint .` fails anyway on this repo (ESLint 9,
+  no flat config). `razor-hint.md` still doesn't point at `check.sh`.
+- The enriched `steering.md` dropped the deterministic guardrails (Jest only,
+  Sequelize, no raw SQL, don't reformat unrelated code).
+- The pack was generated from a clone with a git remote, so it has a
+  `code-push` skill. The eval workspace has no remote. No task asks to commit
+  or push, so it should stay unused.
+
+Failed Bash calls caused by these show up as re-correction loops and failed
+tool calls on the razor arm. When a razor run looks worse than naive, check
+the trace for these commands before blaming the task.
+
+
+## 12. Outline: hard real-fix tasks (o1–o6)
+
+**Why Outline.** nodejs-testing-best-practices is a tutorial repo with no
+issue → fix → test history to mine. outline/outline (≈41k stars; Koa,
+Sequelize with migrations, Postgres, Redis, vitest) has many multi-file fixes
+merged after the model's knowledge cutoff, each with its own tests. Every
+task is pinned to its fix's parent commit and graded by the fix's own tests
+(SWE-bench style), with shown and hidden criteria as in §10.
+
+**Razor arm.** The pack is generated fresh in each workspace with the current
+Razor (`RAZOR_NO_LLM=1 razor scaffold --target claude`), and its output isn't
+edited. Whatever Razor gets wrong is part of what's measured. On Outline,
+Razor's `AGENTS.md` **replaces** the repo's own 223-line `AGENTS.md` (Razor
+overwrites an existing entry file), so the razor arm loses Outline's own agent
+guide, while the naive arm keeps it. That's what a user running Razor on this
+repo gets today.
+
+**Environment (both arms).** Node 26.12 (from `.nvmrc`; the host's Node 23
+is outside Outline's engines range) and yarn 4 through corepack, from
+`$RAZOR_AB_DIR/tools`, via `repo.json` → `path`. Each slot gets its own
+Postgres 16 and Redis 7 containers, and `.env.test` is pointed at them before
+the workspace's `git init`. `up` and `pregrade` run the repo's own
+`make test` recipe (drop, create, migrate), so an agent's new migration is
+applied from scratch at grading time.
+
+| Task | Real fix | Layers | Shown | Hidden | Decoy |
+|---|---|---|---|---|---|
+| o1-outline-deleted-by | def3a42752 (#13484) | migration, base model hooks, 2 models, presenter, API | AC1–AC5 | AC6 no-user delete, AC7 models without the column (guard), AC8 one query for a page of documents, AC9 eager-loaded user kept, AC10 no existing migration edited (guard) | per-document user lookup: AC8 ✗ AC9 ✗ |
+| o2-outline-tsvector-limit | 18a7099e8f (#13832) | new migration rewriting a PL/pgSQL trigger | AC1 | AC2 no existing migration edited (guard) | – |
+| o3-outline-findbypk-reject | fc8d10311b (#13974) | 4 model overrides, `urls.unfurl` | AC1–AC5 | AC6–AC8 non-string ids (incl. FileOperation, not named), AC9 caller's own Error | – |
+| o4-outline-group-duplicate-names | aacc98475d (#13894) | model validator, groups syncer | AC1–AC3 | AC4 backfill externalId on groups synced earlier | no backfill: AC4 ✗ |
+| o5-outline-group-timestamp | ed4aaf274d (#13888) | model hooks, API | AC1–AC3 | AC4 bulk destroy, AC5 rollback (guard), AC6 re-add existing member (guard) | touch outside the transaction: AC5 ✗ |
+| o6-outline-import-cleanup | f852339c57 (#13757, issue #13747) | import processor, API import task (scratch cleared too early) | AC1 | AC2 import completes when the deletion fails (guard) | unguarded delete: AC2 ✗ |
+
+Notes:
+
+- **o1.** `Collection.test.ts` isn't used. The fix changed
+  `Collection#deleteDocument`'s signature, an internal refactor the issue
+  doesn't imply, and the post-fix file only follows it.
+- **o6.** The prompt is the real issue's text plus a one-paragraph maintainer
+  note naming the attachment and the scratch field the tests check.
+- **Considered and dropped.** #13208, #13542 and #13809: their tests import
+  modules the fix creates (`NotificationsRevokeProcessor`, `LockHelper`,
+  `zaddWithSequence`), whose names an agent can't infer. #13329: its tests only
+  cover the one-line part of the fix.
+
+### Results: run `outline-opus` (Opus 5.5, medium effort, 2 reps per arm)
+
+Results are in `results/outline-opus/`. Excluded rows live in `excluded/`: o1's
+first rep ran with a wrong prompt sentence (since fixed), its third rep was
+dropped when the run was cut to 2 reps, and runs killed by the account usage
+limit went to `errors.jsonl` and were never scored.
+
+| Task | naive pass | razor pass | shown (n / z) | hidden (n / z) | razor/naive tokens | razor/naive time |
+|---|---|---|---|---|---|---|
+| o1 deleted-by | 0/2 | 0/2 | 4/5 4/5 · 4/5 4/5 | 4/5 3/5 · 4/5 3/5 | 1.79× | 1.55× |
+| o2 tsvector-limit | 2/2 | 2/2 | all | all | 1.31× | 1.85× |
+| o3 findbypk-reject | 0/2 | 0/2 | all | 3/4 ×2 · 3/4 ×2 | 1.75× | 1.66× |
+| o4 group-duplicate-names | 2/2 | 2/2 | all | all | 0.77× | 1.02× |
+| o5 group-timestamp | 2/2 | 2/2 | all | all | 1.07× | 1.01× |
+| o6 import-cleanup | 1/2 | 1/2 | all | 1/1 0/1 · 1/1 0/1 | 1.48× | 1.40× |
+
+Ratios are of per-arm medians; above 1× means Razor used more. Medians over
+the six tasks: tokens 1.39×, time 1.47×. Total cost $8.52 naive, $9.74 razor.
+
+- **Quality: no difference.** In every rep both arms passed and failed exactly
+  the same criteria. o1 AC4 (model-level `destroy` with a context) was missed
+  in all runs of both arms. Both arms put attribution in the API path.
+- **Cost: Razor was more expensive on 5 of 6 tasks.** Across the 24 runs the
+  razor arm ran `yarn lint` 39 times against naive's 21, and `tsc` 24 times
+  against 17. Razor's `verification.md`, `check.sh` and "run the verification
+  steps" ground rule all point at `yarn lint` (type-aware oxlint over the
+  whole monorepo). Both arms ran about the same number of targeted vitest
+  files (53 vs 49).
+- **Pack use:** every razor run read `AGENTS.md` and used `run-tests`; o1 and
+  o2 also used `db-migrations`. Razor's `AGENTS.md` replaced Outline's own
+  guide in the razor arm (see above).
+- **Caveat:** 2 reps per arm. Run-to-run variance is visible (o5 naive took
+  4.4 and 8.6 min), so per-task ratios are indicative, not significant.

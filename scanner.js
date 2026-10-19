@@ -211,24 +211,40 @@ function detectPackageManager(files) {
   return 'unknown';
 }
 
-// pull the handful of commands an agent actually needs (build/test/dev/start/lint)
-function extractScripts(pkg) {
-  if (!pkg || !pkg.scripts) return {};
+// how to run a package.json script. The script body alone isn't runnable: it
+// relies on node_modules/.bin being on PATH, which only the package manager sets up.
+function scriptInvocation(name, pm) {
+  if (pm === 'yarn') return `yarn ${name}`;
+  if (pm === 'pnpm') return `pnpm run ${name}`;
+  return name === 'test' ? 'npm test' : `npm run ${name}`;
+}
+
+// pull the handful of commands an agent actually needs (build/test/dev/start/lint).
+// scripts: role -> the command that runs it (`npm run db:migrate`, never a
+// made-up `npm run migrate`). sources: role -> the real script name and body.
+function extractScripts(pkg, pm) {
+  if (!pkg || !pkg.scripts) return { scripts: {}, sources: {} };
   const all = pkg.scripts;
   const wanted = ['dev', 'start', 'build', 'test', 'lint', 'typecheck', 'format', 'migrate'];
-  const out = {};
+  const names = {};
   for (const k of wanted) {
-    if (all[k]) out[k] = all[k];
+    if (all[k]) names[k] = k;
   }
   // migration scripts are commonly namespaced (db:migrate, migrate:up). if we
   // didn't find an exact `migrate` key, fall back to the first script whose
   // name contains "migrate". kept narrow on purpose: a broad fuzzy match would
   // misclassify e.g. test:dev as the dev script.
-  if (!out.migrate) {
+  if (!names.migrate) {
     const hit = Object.keys(all).find((name) => /(^|[:_-])migrate([:_-]|$)/i.test(name));
-    if (hit) out.migrate = all[hit];
+    if (hit) names.migrate = hit;
   }
-  return out;
+  const scripts = {};
+  const sources = {};
+  for (const [role, name] of Object.entries(names)) {
+    scripts[role] = scriptInvocation(name, pm);
+    sources[role] = { name, body: all[name] };
+  }
+  return { scripts, sources };
 }
 
 // top-level dirs with a rough guess at what they hold
@@ -359,6 +375,8 @@ function scanRepo(dir) {
       .find((f) => files.includes(f)) || 'unknown';
   const pkg = stack._pkg || null;
   delete stack._pkg;
+  const packageManager = detectPackageManager(files);
+  const { scripts, sources } = extractScripts(pkg, packageManager);
 
   return {
     language: stack.language,
@@ -366,9 +384,11 @@ function scanRepo(dir) {
     testing: stack.testing,
     orm: stack.orm,
     routes_folder: detectRoutesFolder(root, files, ev),
-    package_manager: detectPackageManager(files),
+    package_manager: packageManager,
     entry_point: entryPoint,
-    scripts: extractScripts(pkg),
+    scripts,
+    script_sources: sources,
+    package_scripts: Object.keys((pkg && pkg.scripts) || {}),
     key_dependencies: extractKeyDeps(pkg),
     env_vars: extractEnvVars(root, files),
     structure: extractStructure(root, files),

@@ -128,3 +128,24 @@ test('tool calls that reach the harness files are flagged as possible leaks', ()
   assert.strictEqual(m.leaks.length, 1);
   assert.strictEqual(m.leaks[0].tool, 'Bash');
 });
+
+test('skills_used counts a skill invoked or any of its files read, including via Bash', () => {
+  const events = stream();
+  events.splice(1, 0,
+    assistant('m0', usage(2, 9000, 100, 20), [
+      toolUse('s0', 'Skill', { skill: 'run-tests' }),
+      toolUse('b0', 'Bash', { command: 'cat .claude/skills/db-migrations/reference.md' }),
+    ]),
+    toolResult('s0', 'skill loaded'),
+    toolResult('b0', 'reference'),
+  );
+  const m = computeMetrics(events, [], {
+    ws: '/ws',
+    packFiles: [
+      'AGENTS.md', '.claude/skills/run-tests/SKILL.md', '.claude/skills/db-migrations/SKILL.md',
+      '.claude/skills/db-migrations/reference.md', '.claude/skills/local-env/SKILL.md',
+    ],
+  });
+  assert.deepStrictEqual(m.pack.skills_invoked, ['run-tests']);
+  assert.deepStrictEqual(m.pack.skills_used, ['run-tests', 'db-migrations']);
+});

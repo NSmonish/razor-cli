@@ -141,7 +141,7 @@ function buildSummary(flow) {
       .map((r) => {
         const p = r.metrics.pack;
         if (!p) return '–';
-        return `${p.used ? 'used' : '**unused**'} (read: ${p.files_read.join(', ') || 'none'}; skills: ${p.skills_invoked.join(', ') || 'none'}; check.sh runs: ${p.check_sh_runs})`;
+        return `${p.used ? 'used' : '**unused**'} (read: ${p.files_read.join(', ') || 'none'}; skills invoked: ${p.skills_invoked.join(', ') || 'none'}; skills used: ${(p.skills_used || []).join(', ') || 'none'}; check.sh runs: ${p.check_sh_runs})`;
       })
       .join(' / ');
     L.push(`| Pack used | n/a | ${packStr || '–'} | |`);

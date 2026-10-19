@@ -5,7 +5,13 @@ coding tasks without making it worse at them. Every task runs twice, at the same
 moment, in two disposable copies of the repo:
 
 - **naive**: the repo only
-- **razor**: the repo plus `razor scaffold --target claude --offline`
+- **razor**: the repo plus a Razor context pack in the Claude Code layout
+  (`AGENTS.md`, docs, `.claude/skills/`, `skills.index.json`, `scripts/check.sh`).
+  If the repo's `repo.json` sets `razor_pack`, that pinned pack is copied in
+  as-is. nodejs-testing-best-practices pins the worked example in
+  [`examples/nodejs-testing-best-practices/pack`](../../examples/nodejs-testing-best-practices/pack).
+  Otherwise the pack is generated per workspace with
+  `RAZOR_NO_LLM=1 razor scaffold --target claude` (deterministic, no LLM).
 
 The finished workspace is graded with hidden acceptance tests. Tokens, context,
 time, cost, tool calls, exploration before the first edit, re-correction loops,
@@ -18,6 +24,24 @@ and pack usage are recorded per run. The design and exact definitions are in
 - Claude Code CLI (`claude`) logged in. CI needs an `ANTHROPIC_API_KEY`
 - Docker running (the current tasks' tests need Postgres)
 - git
+
+### Outline tasks (o1–o6): one-time setup
+
+Outline needs Node 26 and yarn 4, kept in the harness work dir so the host's
+Node is untouched. `repo.json` → `path` puts them first on `PATH` for installs,
+hooks, the agent and grading:
+
+```bash
+mkdir -p /tmp/razor-ab/tools && cd /tmp/razor-ab/tools
+curl -O https://nodejs.org/dist/v26.12.0/node-v26.12.0-darwin-arm64.tar.gz
+tar xzf node-v26.12.0-darwin-arm64.tar.gz
+export PATH=/tmp/razor-ab/tools/node-v26.12.0-darwin-arm64/bin:$PATH
+npm i -g corepack@0.34.0
+corepack enable --install-directory /tmp/razor-ab/tools/node-v26.12.0-darwin-arm64/bin
+```
+
+Each slot also runs its own `postgres:16` and `redis:7` containers. See
+`EVAL_SPEC.md` §12.
 
 ## Run it
 
@@ -41,8 +65,11 @@ default 10), `--arms naive` (run one arm only), `--keep-workspaces` (keep the
 workspaces for debugging), `--claude-arg <arg>` (pass extra flags through to `claude`).
 
 Runs can be resumed: re-running the same `--name` skips any (task, arm, rep) that
-already has a result. A run refuses to resume with a different model, effort, or
-Claude Code version unless you pass `--force`.
+already has a result. A run refuses to resume with a different model, effort,
+Claude Code version, or razor-arm pack unless you pass `--force`. A pinned pack
+is identified by a hash of its files (`meta.razor_pack`), so editing the worked
+example needs a new `--name`. Runs from before this was recorded used
+`scaffold --offline` and can't be resumed with the current pack.
 
 Workspaces, the repo cache, and validation results live in `/tmp/razor-ab`
 (override with `RAZOR_AB_DIR`).
@@ -63,7 +90,9 @@ can work on it later, for example to tune Razor's pack against this eval.
 
 1. `repos/<repo>/repo.json`: URL, pinned commit, install command, test paths.
    Add a `hooks.sh` if the tests need isolated services. See the existing
-   repo's per-arm Postgres for an example.
+   repo's per-arm Postgres for an example. Optional `razor_pack`: a pack
+   directory (relative to the razor-cli root) to give the razor arm instead of
+   generating one. Its files must not collide with repo files.
 2. `tasks/<id>/`:
    - `prompt.md`: a symptom-style request. No file names, no fix.
    - `break.patch`: removes or breaks the behavior (against the pinned commit).

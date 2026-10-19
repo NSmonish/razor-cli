@@ -1,0 +1,385 @@
+diff --git a/server/models/Collection.test.ts b/server/models/Collection.test.ts
+index bfce911..6e29ad2 100644
+--- a/server/models/Collection.test.ts
++++ b/server/models/Collection.test.ts
+@@ -1,4 +1,5 @@
+ import { randomUUID } from "node:crypto";
++import { EmptyResultError } from "sequelize";
+ import { randomString } from "@shared/random";
+ import slugify from "@shared/utils/slugify";
+ import { createContext } from "@server/context";
+@@ -603,6 +604,20 @@ describe("#findByPk", () => {
+     expect(response).toBe(null);
+   });
+ 
++  it("should reject malformed ids when rejectOnEmpty is passed", async () => {
++    const collection = await buildCollection();
++    await expect(
++      Collection.findByPk(collection.id + "-incorrect", {
++        rejectOnEmpty: true,
++      })
++    ).rejects.toThrow(EmptyResultError);
++
++    const error = new Error("does not exist");
++    await expect(
++      Collection.findByPk("invalid", { rejectOnEmpty: error })
++    ).rejects.toThrow(error);
++  });
++
+   it("should return null when no collection is found with uuid", async () => {
+     const response = await Collection.findByPk(
+       "a9e71a81-7342-4ea3-9889-9b9cc8f667da"
+diff --git a/server/models/Collection.ts b/server/models/Collection.ts
+index bb0b285..33e2ed0 100644
+--- a/server/models/Collection.ts
++++ b/server/models/Collection.ts
+@@ -671,10 +671,6 @@ class Collection extends ParanoidModel<
+     id: Identifier,
+     options: FindOptions<Collection> & AdditionalFindOptions = {}
+   ): Promise<Collection | null> {
+-    if (typeof id !== "string") {
+-      return null;
+-    }
+-
+     const {
+       includeDocumentStructure,
+       includeOwner,
+@@ -699,44 +695,38 @@ class Collection extends ParanoidModel<
+ 
+     const scope = this.scope(scopes);
+ 
+-    if (isUUID(id)) {
+-      const collection = await scope.findOne({
+-        ...rest,
+-        where: {
+-          id,
+-        },
+-        rejectOnEmpty: false,
+-      });
++    let collection: Collection | null = null;
+ 
+-      if (!collection && rest.rejectOnEmpty) {
+-        throw rest.rejectOnEmpty instanceof Error
+-          ? rest.rejectOnEmpty
+-          : new EmptyResultError(`Collection doesn't exist with id: ${id}`);
++    if (typeof id === "string") {
++      if (isUUID(id)) {
++        collection = await scope.findOne({
++          ...rest,
++          where: {
++            id,
++          },
++          rejectOnEmpty: false,
++        });
++      } else {
++        const match = id.match(UrlHelper.SLUG_URL_REGEX);
++        if (match) {
++          collection = await scope.findOne({
++            ...rest,
++            where: {
++              urlId: match[1],
++            },
++            rejectOnEmpty: false,
++          });
++        }
+       }
+-
+-      return collection;
+     }
+ 
+-    const match = id.match(UrlHelper.SLUG_URL_REGEX);
+-    if (match) {
+-      const collection = await scope.findOne({
+-        ...rest,
+-        where: {
+-          urlId: match[1],
+-        },
+-        rejectOnEmpty: false,
+-      });
+-
+-      if (!collection && rest.rejectOnEmpty) {
+-        throw rest.rejectOnEmpty instanceof Error
+-          ? rest.rejectOnEmpty
+-          : new EmptyResultError(`Collection doesn't exist with id: ${id}`);
+-      }
+-
+-      return collection;
++    if (!collection && rest.rejectOnEmpty) {
++      throw rest.rejectOnEmpty instanceof Error
++        ? rest.rejectOnEmpty
++        : new EmptyResultError(`Collection doesn't exist with id: ${String(id)}`);
+     }
+ 
+-    return null;
++    return collection;
+   }
+ 
+   /**
+diff --git a/server/models/Document.test.ts b/server/models/Document.test.ts
+index d6111bf..616e80e 100644
+--- a/server/models/Document.test.ts
++++ b/server/models/Document.test.ts
+@@ -648,6 +648,21 @@ describe("#findByPk", () => {
+     ).rejects.toThrow(EmptyResultError);
+   });
+ 
++  it("should reject malformed ids when rejectOnEmpty is passed", async () => {
++    await expect(
++      Document.findByPk("invalid", { rejectOnEmpty: true })
++    ).rejects.toThrow(EmptyResultError);
++
++    const error = new Error("does not exist");
++    await expect(
++      Document.findByPk("invalid", { rejectOnEmpty: error })
++    ).rejects.toThrow(error);
++  });
++
++  it("should return null for malformed ids without rejectOnEmpty", async () => {
++    await expect(Document.findByPk("invalid")).resolves.toBeNull();
++  });
++
+   it("should omit content columns when includeContent is false", async () => {
+     const document = await buildDocument({ text: "# Heading" });
+ 
+diff --git a/server/models/Document.ts b/server/models/Document.ts
+index af5f7d2..f5a7b99 100644
+--- a/server/models/Document.ts
++++ b/server/models/Document.ts
+@@ -922,10 +922,6 @@ class Document extends ArchivableModel<
+     options: (NonNullFindOptions<Document> | FindOptions<Document>) &
+       AdditionalFindOptions = {}
+   ): Promise<Document | null> {
+-    if (typeof id !== "string") {
+-      return null;
+-    }
+-
+     const {
+       includeViews = true,
+       includeState = false,
+@@ -956,44 +952,38 @@ class Document extends ArchivableModel<
+       },
+     ]);
+ 
+-    if (isUUID(id)) {
+-      const document = await scope.findOne({
+-        ...rest,
+-        where: {
+-          id,
+-        },
+-        rejectOnEmpty: false,
+-      });
++    let document: Document | null = null;
+ 
+-      if (!document && rest.rejectOnEmpty) {
+-        throw rest.rejectOnEmpty instanceof Error
+-          ? rest.rejectOnEmpty
+-          : new EmptyResultError(`Document doesn't exist with id: ${id}`);
++    if (typeof id === "string") {
++      if (isUUID(id)) {
++        document = await scope.findOne({
++          ...rest,
++          where: {
++            id,
++          },
++          rejectOnEmpty: false,
++        });
++      } else {
++        const match = id.match(UrlHelper.SLUG_URL_REGEX);
++        if (match) {
++          document = await scope.findOne({
++            ...rest,
++            where: {
++              urlId: match[1],
++            },
++            rejectOnEmpty: false,
++          });
++        }
+       }
+-
+-      return document;
+     }
+ 
+-    const match = id.match(UrlHelper.SLUG_URL_REGEX);
+-    if (match) {
+-      const document = await scope.findOne({
+-        ...rest,
+-        where: {
+-          urlId: match[1],
+-        },
+-        rejectOnEmpty: false,
+-      });
+-
+-      if (!document && rest.rejectOnEmpty) {
+-        throw rest.rejectOnEmpty instanceof Error
+-          ? rest.rejectOnEmpty
+-          : new EmptyResultError(`Document doesn't exist with id: ${id}`);
+-      }
+-
+-      return document;
++    if (!document && rest.rejectOnEmpty) {
++      throw rest.rejectOnEmpty instanceof Error
++        ? rest.rejectOnEmpty
++        : new EmptyResultError(`Document doesn't exist with id: ${String(id)}`);
+     }
+ 
+-    return null;
++    return document;
+   }
+ 
+   /**
+diff --git a/server/models/Template.test.ts b/server/models/Template.test.ts
+new file mode 100644
+index 0000000..5721949
+--- /dev/null
++++ b/server/models/Template.test.ts
+@@ -0,0 +1,37 @@
++import { EmptyResultError } from "sequelize";
++import { buildTemplate } from "@server/test/factories";
++import Template from "./Template";
++
++describe("#findByPk", () => {
++  it("should return template by id and urlId", async () => {
++    const template = await buildTemplate();
++    const byId = await Template.findByPk(template.id);
++    expect(byId?.id).toBe(template.id);
++
++    const byUrlId = await Template.findByPk(template.urlId);
++    expect(byUrlId?.id).toBe(template.id);
++  });
++
++  it("should return null for malformed ids without rejectOnEmpty", async () => {
++    await expect(Template.findByPk("invalid")).resolves.toBeNull();
++  });
++
++  it("should reject missing ids when rejectOnEmpty is passed", async () => {
++    await expect(
++      Template.findByPk("0e8280ea-7b4c-40e5-98ba-ec8a2f00f5e8", {
++        rejectOnEmpty: true,
++      })
++    ).rejects.toThrow(EmptyResultError);
++  });
++
++  it("should reject malformed ids when rejectOnEmpty is passed", async () => {
++    await expect(
++      Template.findByPk("invalid", { rejectOnEmpty: true })
++    ).rejects.toThrow(EmptyResultError);
++
++    const error = new Error("does not exist");
++    await expect(
++      Template.findByPk("invalid", { rejectOnEmpty: error })
++    ).rejects.toThrow(error);
++  });
++});
+diff --git a/server/models/Template.ts b/server/models/Template.ts
+index 5c1091e..083118f 100644
+--- a/server/models/Template.ts
++++ b/server/models/Template.ts
+@@ -243,10 +243,6 @@ class Template extends ParanoidModel<
+     options: (NonNullFindOptions<Template> | FindOptions<Template>) &
+       AdditionalFindOptions = {}
+   ): Promise<Template | null> {
+-    if (typeof id !== "string") {
+-      return null;
+-    }
+-
+     const { includeState, userId, ...rest } = options;
+ 
+     // allow default preloading of collection membership if `userId` is passed in find options
+@@ -258,40 +254,38 @@ class Template extends ParanoidModel<
+       },
+     ]);
+ 
+-    if (isUUID(id)) {
+-      const template = await scope.findOne({
+-        where: {
+-          id,
+-        },
+-        ...rest,
+-        rejectOnEmpty: false,
+-      });
+-
+-      if (!template && rest.rejectOnEmpty) {
+-        throw new EmptyResultError(`Template doesn't exist with id: ${id}`);
++    let template: Template | null = null;
++
++    if (typeof id === "string") {
++      if (isUUID(id)) {
++        template = await scope.findOne({
++          where: {
++            id,
++          },
++          ...rest,
++          rejectOnEmpty: false,
++        });
++      } else {
++        const match = id.match(UrlHelper.SLUG_URL_REGEX);
++        if (match) {
++          template = await scope.findOne({
++            where: {
++              urlId: match[1],
++            },
++            ...rest,
++            rejectOnEmpty: false,
++          });
++        }
+       }
+-
+-      return template;
+     }
+ 
+-    const match = id.match(UrlHelper.SLUG_URL_REGEX);
+-    if (match) {
+-      const template = await scope.findOne({
+-        where: {
+-          urlId: match[1],
+-        },
+-        ...rest,
+-        rejectOnEmpty: false,
+-      });
+-
+-      if (!template && rest.rejectOnEmpty) {
+-        throw new EmptyResultError(`Template doesn't exist with id: ${id}`);
+-      }
+-
+-      return template;
++    if (!template && rest.rejectOnEmpty) {
++      throw rest.rejectOnEmpty instanceof Error
++        ? rest.rejectOnEmpty
++        : new EmptyResultError(`Template doesn't exist with id: ${String(id)}`);
+     }
+ 
+-    return null;
++    return template;
+   }
+ }
+ 
+diff --git a/server/routes/api/urls/urls.test.ts b/server/routes/api/urls/urls.test.ts
+index dd41378..039aebe 100644
+--- a/server/routes/api/urls/urls.test.ts
++++ b/server/routes/api/urls/urls.test.ts
+@@ -444,6 +444,25 @@ Install instructions here.`
+     expect(body.url).toContain(`/s/${share.id}/doc/`);
+   });
+ 
++  it("should fail with status 404 not found when share url has an invalid document slug", async () => {
++    const document = await buildDocument({
++      teamId: user.teamId,
++    });
++    const share = await buildShare({
++      teamId: user.teamId,
++      userId: user.id,
++      documentId: document.id,
++      published: true,
++    });
++
++    const res = await server.post("/api/urls.unfurl", user, {
++      body: {
++        url: `${env.URL}/s/${share.id}/doc/invalid`,
++      },
++    });
++    expect(res.status).toEqual(404);
++  });
++
+   it("should return 204 for collection share url without document", async () => {
+     const collection = await buildCollection({
+       teamId: user.teamId,

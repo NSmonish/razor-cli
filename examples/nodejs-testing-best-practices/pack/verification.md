@@ -3,7 +3,7 @@ name: verification
 kind: doc
 description: has tests, lint, or a build to verify work
 version: 1
-generated: 2026-10-12
+generated: 2026-10-19
 razor_format: 1.0
 ---
 
@@ -12,8 +12,8 @@ razor_format: 1.0
 How to check that work is correct before calling a task done.
 
 ## Checks
-- Lint: `eslint .`
-- Tests: `jest`
+- Lint: `npm run lint`
+- Tests: `npm test`
 
 ## One-shot
 - Run `scripts/check.sh` to do lint + test in one go.

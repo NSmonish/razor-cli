@@ -1,0 +1,11 @@
+{
+  "name": "outline",
+  "url": "https://github.com/outline/outline",
+  "commit": "a28a68188",
+  "install": [["corepack", "yarn", "install", "--immutable"]],
+  "path": ["${RAZOR_AB_DIR}/tools/node-v26.12.0-darwin-arm64/bin"],
+  "hooks": "hooks.sh",
+  "test_runner": "vitest",
+  "test_paths": [],
+  "test_timeout_s": 900
+}

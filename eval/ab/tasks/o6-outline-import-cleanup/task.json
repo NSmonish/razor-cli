@@ -1,0 +1,33 @@
+{
+  "id": "o6-outline-import-cleanup",
+  "repo": "outline",
+  "commit": "2d07783af714b5734c4f2ca1a4535199a8d625cc",
+  "source_fix": "outline/outline@f852339c57 (2026-09-16, #13757, closes issue #13747): fix: Remove source uploads after imports",
+  "tags": ["real-fix", "real-issue", "hidden-acs", "large-repo", "hard", "multi-file", "queues"],
+  "prompt": "prompt.md",
+  "solution": "solution.patch",
+  "supp_files": {
+    "server/queues/tasks/JSONAPIImportTask.test.ts": "supp/server/queues/tasks/JSONAPIImportTask.test.ts"
+  },
+  "regression_paths": [
+    "server/queues/tasks/JSONAPIImportTask.test.ts",
+    "server/queues/processors/ImportsProcessor.test.ts",
+    "server/routes/api/imports/imports.test.ts"
+  ],
+  "acceptance": [
+    { "id": "AC1", "visibility": "shown", "source": "orig",
+      "desc": "after a completed import the source attachment is deleted and scratch is cleared",
+      "file": "server/queues/tasks/JSONAPIImportTask.test.ts",
+      "title": "JSONAPIImportTask > deletes the source archive after the import completes", "null_expect": "fail" },
+    { "id": "AC2", "visibility": "hidden", "source": "orig",
+      "desc": "if deleting the archive fails, the import still completes and the archive stays",
+      "file": "server/queues/tasks/JSONAPIImportTask.test.ts",
+      "title": "JSONAPIImportTask > completes the import when source archive cleanup fails", "null_expect": "pass",
+      "leak_strings": ["cleanup fails", "deletion fails", "storage unavailable"] }
+  ],
+  "decoys": [
+    { "patch": "decoy-unguarded-delete.patch",
+      "desc": "the full fix, but a failure deleting the archive propagates out of the import",
+      "expect": { "AC1": "pass", "AC2": "fail" } }
+  ]
+}

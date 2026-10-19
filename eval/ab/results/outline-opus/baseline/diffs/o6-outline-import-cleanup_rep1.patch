@@ -1,0 +1,186 @@
+diff --git a/server/queues/processors/ImportsProcessor.ts b/server/queues/processors/ImportsProcessor.ts
+index c1df192..88a0368 100644
+--- a/server/queues/processors/ImportsProcessor.ts
++++ b/server/queues/processors/ImportsProcessor.ts
+@@ -203,8 +203,11 @@ export default abstract class ImportsProcessor<
+         await collection.save({ silent: true, transaction });
+       }
+ 
++      await this.destroyUploadedArchive(importModel, transaction);
++
+       importModel.state = ImportState.Completed;
+       importModel.error = null; // unset any error from previous attempts.
++      importModel.scratch = null; // release cross-phase state, the import is done with it.
+       await importModel.saveWithCtx(
+         createContext({
+           user: importModel.createdBy,
+@@ -226,6 +229,31 @@ export default abstract class ImportsProcessor<
+     }
+   }
+ 
++  /**
++   * Delete the uploaded archive (if any) that the import was created from. The
++   * archive is stored as an attachment whose key is `scratch.storageKey`.
++   *
++   * @param importModel Import model whose archive should be removed.
++   * @param transaction Sequelize transaction.
++   * @returns Promise that resolves when the archive has been deleted.
++   */
++  private async destroyUploadedArchive(
++    importModel: Import<T>,
++    transaction: Transaction
++  ) {
++    const storageKey = importModel.scratch?.storageKey;
++    if (!storageKey) {
++      return;
++    }
++
++    const attachment = await Attachment.findOne({
++      where: { key: storageKey, teamId: importModel.teamId },
++      transaction,
++    });
++
++    await attachment?.destroy({ transaction });
++  }
++
+   /**
+    * Handle "imports.delete" event.
+    * This method is responsible for deleting the collections and documents associated with the import.
+diff --git a/server/queues/tasks/APIImportTask.ts b/server/queues/tasks/APIImportTask.ts
+index bfdd0a3..6f5b98e 100644
+--- a/server/queues/tasks/APIImportTask.ts
++++ b/server/queues/tasks/APIImportTask.ts
+@@ -259,8 +259,8 @@ export default abstract class APIImportTask<
+     await sequelize.transaction(async (transaction) => {
+       const associatedImport = importTask.import;
+       associatedImport.state = ImportState.Processed;
+-      // Release any cross-phase scratch state — the import is done with it.
+-      associatedImport.scratch = null;
++      // Scratch state (including the uploaded archive's storage key) is kept
++      // until the persistence pass completes, see ImportsProcessor.
+       await associatedImport.saveWithCtx(
+         createContext({
+           user: associatedImport.createdBy,
+diff --git a/server/queues/tasks/JSONAPIImportTask.test.ts b/server/queues/tasks/JSONAPIImportTask.test.ts
+index b712f63..98c85ec 100644
+--- a/server/queues/tasks/JSONAPIImportTask.test.ts
++++ b/server/queues/tasks/JSONAPIImportTask.test.ts
+@@ -7,18 +7,21 @@ import {
+   Attachment,
+   Collection,
+   Document,
++  Import,
+   ImportTask,
+   User,
+ } from "@server/models";
+ import FileStorage from "@server/storage/files";
+ import {
+   CollectionPermission,
++  ImportState,
+   ImportTaskPhase,
+   ImportTaskState,
+   IntegrationService,
+ } from "@shared/types";
+ import {
+   buildAdmin,
++  buildAttachment,
+   buildDocument,
+   buildImport,
+   buildTeam,
+@@ -228,6 +231,7 @@ async function runImport(opts: {
+   teamId: string;
+   createdById: string;
+   zipPath: string;
++  storageKey?: string;
+ }): Promise<{ importId: string }> {
+   vi.spyOn(FileStorage, "getFileHandle").mockResolvedValue({
+     path: opts.zipPath,
+@@ -242,7 +246,7 @@ async function runImport(opts: {
+     input: [
+       { externalId: randomUUID(), permission: CollectionPermission.Read },
+     ],
+-    scratch: { storageKey: "fixture-key" },
++    scratch: { storageKey: opts.storageKey ?? "fixture-key" },
+   });
+ 
+   // Seed the bootstrap row that JSONImportsProcessor would have created.
+@@ -331,6 +335,64 @@ describe("JSONAPIImportTask", () => {
+     expect(attachments.length).toBeGreaterThanOrEqual(1);
+   });
+ 
++  it("deletes the uploaded archive and clears scratch once completed", async () => {
++    const admin = await buildAdmin();
++    const archive = await buildAttachment(
++      { teamId: admin.teamId, userId: admin.id },
++      "export.zip"
++    );
++    const deleteFile = vi
++      .spyOn(FileStorage, "deleteFile")
++      .mockResolvedValue(undefined as never);
++
++    const { importId } = await runImport({
++      teamId: admin.teamId,
++      createdById: admin.id,
++      zipPath: zip.filePath,
++      storageKey: archive.key,
++    });
++
++    const importModel = await Import.findByPk(importId, {
++      rejectOnEmpty: true,
++    });
++    expect(importModel.state).toBe(ImportState.Completed);
++    expect(importModel.scratch).toBeNull();
++    expect(await Attachment.findByPk(archive.id)).toBeNull();
++    expect(deleteFile).toHaveBeenCalledWith(archive.key);
++  });
++
++  it("keeps the uploaded archive when the import has errored", async () => {
++    const admin = await buildAdmin();
++    const archive = await buildAttachment(
++      { teamId: admin.teamId, userId: admin.id },
++      "export.zip"
++    );
++    const importModel = await buildImport({
++      teamId: admin.teamId,
++      createdById: admin.id,
++      service: IntegrationService.JSON,
++      integrationId: null,
++      state: ImportState.Errored,
++      input: [
++        { externalId: randomUUID(), permission: CollectionPermission.Read },
++      ],
++      scratch: { storageKey: archive.key },
++    });
++
++    await new JSONImportsProcessor().perform({
++      name: "imports.processed",
++      modelId: importModel.id,
++      teamId: admin.teamId,
++      actorId: admin.id,
++      ip: "127.0.0.1",
++      changes: { attributes: {}, previous: {} },
++    });
++
++    await importModel.reload();
++    expect(importModel.scratch).toEqual({ storageKey: archive.key });
++    expect(await Attachment.findByPk(archive.id)).not.toBeNull();
++  });
++
+   it("rewrites internal document links to the new urlIds", async () => {
+     const admin = await buildAdmin();
+     // Pre-create a document with the exported urlId so the importer is
+diff --git a/shared/schema.ts b/shared/schema.ts
+index e5a00d2..82612af 100644
+--- a/shared/schema.ts
++++ b/shared/schema.ts
+@@ -128,8 +128,8 @@ export interface JSONImportScratch {
+ /**
+  * Per-importer scratch shape stored on `Import.scratch`. Holds cross-phase
+  * state that the importer needs between bootstrap and completion but that
+- * isn't part of any single task's input. Cleared when the import flips to
+- * `Processed`.
++ * isn't part of any single task's input. Cleared, along with the uploaded
++ * archive referenced by `storageKey`, when the import flips to `Completed`.
+  */
+ export type ImportScratch<T extends ImportableIntegrationService> = T extends
+   | IntegrationService.Markdown

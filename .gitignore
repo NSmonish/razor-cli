@@ -5,3 +5,5 @@ AGENTS.md
 *.pdf
 .agent/
 server/data/
+# the worked example pack ships its AGENTS.md (the A/B eval installs it as-is)
+!examples/*/pack/AGENTS.md

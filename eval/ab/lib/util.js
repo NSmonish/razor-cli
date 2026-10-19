@@ -107,6 +107,14 @@ function claudeVersion() {
   return res.status === 0 ? res.stdout.trim() : 'unknown';
 }
 
+// env for anything that runs the repo's own tooling (install, hooks, tests, the
+// agent): the repo's `path` entries go first on PATH, e.g. a pinned Node the
+// host doesn't have. ${RAZOR_AB_DIR} in an entry is the harness work dir.
+function repoEnv(repo, base = process.env) {
+  const dirs = (repo.path || []).map((p) => p.replace('${RAZOR_AB_DIR}', WORK_DIR));
+  return dirs.length ? { ...base, PATH: [...dirs, base.PATH].join(path.delimiter) } : { ...base };
+}
+
 function log(...args) {
   const ts = new Date().toISOString().slice(11, 19);
   console.log(`[${ts}]`, ...args);
@@ -115,5 +123,5 @@ function log(...args) {
 module.exports = {
   AB_DIR, RAZOR_ROOT, WORK_DIR,
   readJSON, writeJSON, appendJSONL, readJSONL,
-  sh, run, cloneTree, rmrf, patchedFiles, gitRev, claudeVersion, log,
+  sh, run, cloneTree, rmrf, patchedFiles, gitRev, claudeVersion, log, repoEnv,
 };

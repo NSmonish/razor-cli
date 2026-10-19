@@ -1,0 +1,344 @@
+diff --git a/server/migrations/20260818120000-add-deletedById-to-documents.js b/server/migrations/20260818120000-add-deletedById-to-documents.js
+new file mode 100644
+index 000000000..cf4e224c2
+--- /dev/null
++++ b/server/migrations/20260818120000-add-deletedById-to-documents.js
+@@ -0,0 +1,82 @@
++"use strict";
++
++const BATCH_SIZE = 1000;
++
++/** @type {import('sequelize-cli').Migration} */
++module.exports = {
++  async up(queryInterface) {
++    // Every statement is idempotent because the migration cannot run inside a
++    // transaction, so a failure part way through has to be resumable.
++    await queryInterface.sequelize.query(
++      'ALTER TABLE "documents" ADD COLUMN IF NOT EXISTS "deletedById" uuid;'
++    );
++
++    // NOT VALID adds the constraint without scanning the existing rows, which
++    // would hold an exclusive lock for the length of that scan. VALIDATE then
++    // checks them under a lock that still allows reads and writes.
++    const [constraints] = await queryInterface.sequelize.query(
++      `SELECT 1 FROM pg_constraint WHERE conname = 'documents_deletedById_fkey';`
++    );
++    if (!constraints.length) {
++      await queryInterface.sequelize.query(`
++        ALTER TABLE "documents"
++        ADD CONSTRAINT "documents_deletedById_fkey"
++        FOREIGN KEY ("deletedById") REFERENCES "users" ("id")
++        NOT VALID;
++      `);
++    }
++    await queryInterface.sequelize.query(
++      'ALTER TABLE "documents" VALIDATE CONSTRAINT "documents_deletedById_fkey";'
++    );
++
++    // Serves the trash query. Partial so that it only covers deleted documents
++    // rather than the whole table.
++    await queryInterface.sequelize.query(
++      'CREATE INDEX CONCURRENTLY IF NOT EXISTS "documents_deleted_by_id" ON "documents" ("deletedById") WHERE "deletedAt" IS NOT NULL;'
++    );
++
++    // Indexes only the rows the backfill has left to do, so it shrinks as the
++    // loop runs and each batch reads its own rows and nothing else. Without it
++    // every batch re-reads the rows already written, which turns the loop
++    // quadratic on a large table.
++    await queryInterface.sequelize.query(
++      'CREATE INDEX CONCURRENTLY IF NOT EXISTS "documents_deleted_by_backfill" ON "documents" ("id") WHERE "deletedAt" IS NOT NULL AND "deletedById" IS NULL;'
++    );
++
++    // Written in batches, each its own transaction, so that no single statement
++    // locks a large number of rows.
++    let rowCount = 1;
++    let total = 0;
++
++    while (rowCount) {
++      const [, metadata] = await queryInterface.sequelize.query(`
++WITH rows AS (
++  SELECT "id" FROM "documents"
++  WHERE "deletedAt" IS NOT NULL AND "deletedById" IS NULL
++  ORDER BY "id"
++  LIMIT ${BATCH_SIZE}
++)
++UPDATE "documents"
++SET "deletedById" = "lastModifiedById"
++WHERE EXISTS (SELECT 1 FROM rows WHERE "documents"."id" = rows."id")
++      `);
++
++      rowCount = metadata.rowCount;
++      total += rowCount;
++      if (rowCount) {
++        console.log(`Backfilling documents.deletedById… ${total}`);
++      }
++    }
++
++    await queryInterface.sequelize.query(
++      'DROP INDEX CONCURRENTLY IF EXISTS "documents_deleted_by_backfill";'
++    );
++  },
++
++  async down(queryInterface) {
++    // Dropping the column takes the index and the foreign key with it.
++    await queryInterface.sequelize.query(
++      'ALTER TABLE "documents" DROP COLUMN IF EXISTS "deletedById";'
++    );
++  },
++};
+diff --git a/server/models/Collection.ts b/server/models/Collection.ts
+index ba51ab797..b09046f2a 100644
+--- a/server/models/Collection.ts
++++ b/server/models/Collection.ts
+@@ -422,9 +422,12 @@ class Collection extends ParanoidModel<
+ 
+   @BeforeDestroy
+   static async deleteDocuments(model: Collection, ctx: APIContext["context"]) {
++    // A bulk update rather than a destroy per document, so `deletedById` is
++    // written here instead of by the hook on ParanoidModel.
+     await Document.update(
+       {
+         lastModifiedById: ctx.auth.user.id,
++        deletedById: ctx.auth.user.id,
+         deletedAt: new Date(),
+       },
+       {
+@@ -861,26 +864,23 @@ class Collection extends ParanoidModel<
+    * Removes a document from this collection's structure and soft deletes it
+    * along with all of its descendants.
+    *
++   * @param ctx the API context, which attributes the deletion to the acting user.
+    * @param document the document to delete.
+-   * @param user the user performing the deletion, recorded on every document.
+-   * @param options the find options, including an optional transaction.
+    */
+-  deleteDocument = async (
+-    document: Document,
+-    user: User,
+-    options?: FindOptions
+-  ) => {
+-    await this.removeDocumentInStructure(document, options);
++  deleteDocument = async (ctx: APIContext, document: Document) => {
++    const { transaction } = ctx.context;
++
++    await this.removeDocumentInStructure(document, { transaction });
+ 
+     // IDs come back breadth-first so reversing them destroys the deepest
+     // descendants first.
+     const childDocumentIds = (
+-      await document.findAllChildDocumentIds(undefined, options)
++      await document.findAllChildDocumentIds(undefined, { transaction })
+     ).reverse();
+ 
+     if (childDocumentIds.length) {
+       const childDocuments = await Document.findAll({
+-        ...options,
++        transaction,
+         where: {
+           id: childDocumentIds,
+         },
+@@ -889,18 +889,11 @@ class Collection extends ParanoidModel<
+ 
+       // Destroyed one at a time to ensure model hooks run for each document.
+       for (const childDocumentId of childDocumentIds) {
+-        const childDocument = childDocumentsById[childDocumentId];
+-        if (childDocument) {
+-          // Attributes the deletion of the whole tree to the acting user, which
+-          // the trash relies on to show a person their own deletions.
+-          childDocument.lastModifiedById = user.id;
+-          childDocument.updatedBy = user;
+-          await childDocument.destroy(options);
+-        }
++        await childDocumentsById[childDocumentId]?.destroy(ctx.context);
+       }
+     }
+ 
+-    await document.destroy(options);
++    await document.destroy(ctx.context);
+   };
+ 
+   removeDocumentInStructure = async (
+diff --git a/server/models/Document.ts b/server/models/Document.ts
+index 61ef7fe30..23976e251 100644
+--- a/server/models/Document.ts
++++ b/server/models/Document.ts
+@@ -684,6 +684,14 @@ class Document extends ArchivableModel<
+   @Column(DataType.UUID)
+   createdById: string;
+ 
++  @BelongsTo(() => User, "deletedById")
++  deletedBy: User | null;
++
++  /** The user that deleted this document, set automatically on delete. */
++  @ForeignKey(() => User)
++  @Column(DataType.UUID)
++  deletedById: string | null;
++
+   @ForeignKey(() => Template)
+   @Column(DataType.UUID)
+   templateId: string;
+@@ -1451,13 +1459,13 @@ class Document extends ArchivableModel<
+       });
+ 
+       if (!this.archivedAt || (this.archivedAt && collection?.archivedAt)) {
+-        await collection?.deleteDocument(this, user, { transaction });
++        await collection?.deleteDocument(ctx, this);
+         deleted = true;
+       }
+     }
+ 
+     if (!deleted) {
+-      await this.destroy({ transaction });
++      await this.destroy(ctx.context);
+     }
+ 
+     this.lastModifiedById = user.id;
+diff --git a/server/models/base/ParanoidModel.ts b/server/models/base/ParanoidModel.ts
+index 2bdb4746e..f3dd76b35 100644
+--- a/server/models/base/ParanoidModel.ts
++++ b/server/models/base/ParanoidModel.ts
+@@ -1,5 +1,9 @@
+-import { DeletedAt } from "sequelize-typescript";
++import { BeforeDestroy, BeforeRestore, DeletedAt } from "sequelize-typescript";
+ import IdModel from "./IdModel";
++import type { HookContext } from "./Model";
++
++/** The optional column recording the user that deleted a row. */
++const DeletedByField = "deletedById";
+ 
+ class ParanoidModel<
+   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- mirrors Model base; tightening to object resolves Attributes<M> to never inside Sequelize helpers.
+@@ -17,6 +21,36 @@ class ParanoidModel<
+   get isDeleted() {
+     return !!this.deletedAt;
+   }
++
++  /**
++   * Records the acting user against a model that has a `deletedById` column.
++   * Sequelize soft deletes with the same UPDATE that writes `deletedAt`, so the
++   * value set here is persisted without an additional query.
++   *
++   * @param model The model being deleted.
++   * @param context The hook context, which provides the acting user.
++   */
++  @BeforeDestroy
++  static async setDeletedBy(model: ParanoidModel, context: HookContext) {
++    const userId = context.auth?.user?.id;
++
++    if (userId && DeletedByField in this.rawAttributes) {
++      model.setDataValue(DeletedByField, userId);
++    }
++  }
++
++  /**
++   * Clears the recorded deleting user when a model is restored, so that a row
++   * which is no longer deleted carries no attribution.
++   *
++   * @param model The model being restored.
++   */
++  @BeforeRestore
++  static async unsetDeletedBy(model: ParanoidModel) {
++    if (DeletedByField in this.rawAttributes) {
++      model.setDataValue(DeletedByField, null);
++    }
++  }
+ }
+ 
+ export default ParanoidModel;
+diff --git a/server/presenters/document.ts b/server/presenters/document.ts
+index 3cd4f3360..00a43a43b 100644
+--- a/server/presenters/document.ts
++++ b/server/presenters/document.ts
+@@ -3,6 +3,7 @@ import { Hour } from "@shared/utils/time";
+ import { traceFunction } from "@server/logging/tracing";
+ import type { Document } from "@server/models";
+ import FileOperation from "@server/models/FileOperation";
++import User from "@server/models/User";
+ import { DocumentHelper } from "@server/models/helpers/DocumentHelper";
+ import type { APIContext } from "@server/types";
+ import presentUser from "./user";
+@@ -80,6 +81,7 @@ async function presentDocument(
+     publishedAt: document.publishedAt,
+     archivedAt: document.archivedAt,
+     deletedAt: document.deletedAt,
++    deletedBy: undefined,
+     collaboratorIds: [],
+     revision: document.revisionCount,
+     fullWidth: document.fullWidth,
+@@ -114,6 +116,14 @@ async function presentDocument(
+     res.templateId = document.templateId;
+     res.insightsEnabled = document.insightsEnabled;
+     res.popularityScore = document.popularityScore;
++    if (document.deletedById) {
++      const deletedBy =
++        document.deletedBy ??
++        (await document.$get("deletedBy", { paranoid: false }));
++      if (deletedBy) {
++        res.deletedBy = presentUser(deletedBy);
++      }
++    }
+     if (options.includeCommentCount) {
+       res.commentCount = await document.commentCount;
+     }
+@@ -137,8 +147,8 @@ export default traceFunction({
+ })(presentDocument);
+ 
+ /**
+- * Batch-present multiple documents, fetching all related FileOperation records
+- * in a single query instead of one per document.
++ * Batch-present multiple documents, fetching all related FileOperation and
++ * deleting User records in a single query instead of one per document.
+  *
+  * @param ctx the API context.
+  * @param documents the documents to present.
+@@ -169,6 +179,29 @@ export async function presentDocuments(
+         }
+       }
+     }
++
++    // Deduplicated because a page of trashed documents is often the work of a
++    // single person, and only for documents that arrived without the
++    // association so that an eager loaded one is not overwritten.
++    const deletedByIds = new Set(
++      documents
++        .filter((doc) => doc.deletedById && !doc.deletedBy)
++        .map((doc) => doc.deletedById!)
++    );
++
++    if (deletedByIds.size > 0) {
++      const users = await User.unscoped().findAll({
++        where: { id: { [Op.in]: Array.from(deletedByIds) } },
++        paranoid: false,
++      });
++      const userMap = new Map(users.map((user) => [user.id, user]));
++
++      for (const doc of documents) {
++        if (doc.deletedById && !doc.deletedBy) {
++          doc.deletedBy = userMap.get(doc.deletedById) ?? null;
++        }
++      }
++    }
+   }
+ 
+   return Promise.all(
+diff --git a/server/routes/api/documents/documents.ts b/server/routes/api/documents/documents.ts
+index bf93a227c..55f357ffb 100644
+--- a/server/routes/api/documents/documents.ts
++++ b/server/routes/api/documents/documents.ts
+@@ -570,15 +570,10 @@ router.post(
+       ],
+     };
+ 
+-    // The deleting user is currently recorded as the last to modify the
+-    // document, so the public `deletedById` field maps onto that column.
+     const filter = combineFilters(rawFilters);
+     if (filter) {
+       await authorizeFilterFields(user, filter);
+-      const mapped = mapFilterFields(filter, {
+-        deletedById: "lastModifiedById",
+-      });
+-      where[Op.and].push(buildWhere<Document>(mapped));
++      where[Op.and].push(buildWhere<Document>(filter));
+     }
+ 
+     const documents = await Document.scope([

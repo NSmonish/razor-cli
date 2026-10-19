@@ -253,7 +253,12 @@ function computeMetrics(events, arrivals, { ws, packFiles = [], requestedModel, 
         check_sh_runs: checkRuns,
       }
     : null;
-  if (pack) pack.used = pack.files_read.length > 0 || pack.skills_invoked.length > 0 || pack.check_sh_runs > 0;
+  if (pack) {
+    pack.used = pack.files_read.length > 0 || pack.skills_invoked.length > 0 || pack.check_sh_runs > 0;
+    // per skill: invoked, or any of its files (SKILL.md, reference.md) read
+    const readSkill = (s) => pack.files_read.some((f) => f.startsWith(`.claude/skills/${s}/`));
+    pack.skills_used = razorSkills.filter((s) => pack.skills_invoked.includes(s) || readSkill(s));
+  }
 
   // ---- leakage: tool calls that reach the harness's own files (the cached
   // upstream clone with full history, validation workspaces, task folders with
