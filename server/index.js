@@ -148,6 +148,27 @@ ${LOGO(84)}
 <p class="muted">From 10 user interviews conducted by the Razor team, Fall 2026.</p>
 </section>
 
+<section class="block" id="testers">
+<h2>Tested end-to-end on real repos</h2>
+<div class="card">
+<h3>Manasi — Software Engineer, Ericsson</h3>
+<p class="muted">Ran Razor end-to-end on a commercial industry codebase, via Kiro on WSL. What worked:</p>
+<ul style="color:#d5deef;font-size:14.5px;line-height:1.65;margin:10px 0 4px;padding-left:20px">
+<li><strong>Zero-config detection is accurate</strong> — correctly identified the stack from the manifests with no hints, and the evidence map (which file proved each fact) landed well.</li>
+<li><strong>Kiro layout is exactly right</strong> — the <code>-t kiro</code> target produced the correct <code>.kiro/steering</code> + <code>.kiro/skills</code> structure, no manual rearranging.</li>
+<li><strong>Pack size scales sensibly</strong> with repo complexity — more skills for a rich repo, fewer for a minimal one: &ldquo;sensible, not noisy.&rdquo;</li>
+<li><strong>Fast</strong> — the full run took seconds.</li>
+<li>The <a href="/guide">guide</a> and agent-compatibility table were &ldquo;genuinely easy to follow.&rdquo;</li>
+</ul>
+</div>
+<div class="quotes" style="margin-top:14px">
+<blockquote>&ldquo;I ran the scaffold command and got the context files. The commands matched what I normally use. I wasn&rsquo;t sure where to put the files afterward, though.&rdquo;<cite>— Jean, Engineer, New York</cite></blockquote>
+<blockquote>&ldquo;I opened the generated AGENTS.md and checked the instructions, but I couldn&rsquo;t tell whether my coding agent would automatically pick them up. A clear &lsquo;do this next&rsquo; step would help.&rdquo;<cite>— Jean, Engineer, New York</cite></blockquote>
+<blockquote>&ldquo;Only reviewed them so far. The setup looks useful, but I&rsquo;d need to try an actual bug fix before I could say whether it saves time or reduces corrections.&rdquo;<cite>— Jean, Engineer, New York</cite></blockquote>
+</div>
+<p class="muted">Jean&rsquo;s &ldquo;do this next&rdquo; feedback shipped as the step-by-step activation section in the <a href="/guide">guide</a> — per-agent instructions for Claude Code, Cursor, Codex, Copilot, Gemini, and Kiro.</p>
+</section>
+
 <section class="block">
 <h2>Measured results</h2>
 <p class="muted">Side-by-side on the same simulated bug-fix task — same agent, same model, with and without Razor guidance.</p>
