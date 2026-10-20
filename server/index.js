@@ -151,11 +151,10 @@ ${LOGO(84)}
 <section class="block" id="testers">
 <h2>Tested end-to-end on real repos</h2>
 <div class="quotes">
-<blockquote>&ldquo;Zero-config detection is accurate — it correctly identified the stack from the manifests with no hints, and the evidence map, which file proved each fact, landed well.&rdquo;<cite>— Manasi, Software Engineer, Ericsson</cite></blockquote>
-<blockquote>&ldquo;The Kiro layout produces exactly the right .kiro/steering + .kiro/skills structure — no manual rearranging. And pack size scales sensibly with repo complexity: sensible, not noisy.&rdquo;<cite>— Manasi, Software Engineer, Ericsson</cite></blockquote>
-<blockquote>&ldquo;Fast — the whole run took seconds — and the guide and agent-compatibility table were genuinely easy to follow.&rdquo;<cite>— Manasi, Software Engineer, Ericsson</cite></blockquote>
+<blockquote>&ldquo;Zero-config detection is accurate — it correctly identified the stack from the manifests with no hints. The Kiro layout produces exactly the right .kiro/steering + .kiro/skills structure, no manual rearranging, and pack size scales sensibly with repo complexity: sensible, not noisy. The guide was genuinely easy to follow.&rdquo;<cite>— Manasi, Software Engineer, Ericsson</cite></blockquote>
+<blockquote>&ldquo;I ran the scaffold command and I got the context files. The commands matched what I normally use.&rdquo;<cite>— Jean, Engineer, New York</cite></blockquote>
 </div>
-<p class="muted">Manasi ran Razor end-to-end on a commercial industry codebase, via Kiro on WSL.</p>
+<p class="muted">Manasi ran Razor end-to-end on a commercial industry codebase, via Kiro on WSL. Jean ran it on his own repo.</p>
 </section>
 
 <section class="block">
