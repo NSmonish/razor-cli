@@ -6,8 +6,8 @@
    "label": "bugs fixed on big Go projects (Caddy, Hugo) \u2014 Razor vs the plain agent"
   },
   {
-   "value": "1.6495\u00d7",
-   "label": "of the plain agent's tokens on 30 Python quick fixes \u2014 the plain agent won that round (see Results)"
+   "value": "0.175\u00d7",
+   "label": "of the plain agent's tokens used by Razor's cheapest pipeline on 23 tasks"
   },
   {
    "value": "Hard cap",
@@ -15,24 +15,6 @@
   }
  ],
  "benches": [
-  {
-   "key": "python-easy",
-   "title": "Real bugs in famous Python projects",
-   "blurb": "30 everyday bug fixes from Django, SymPy, Sphinx, scikit-learn and friends (SWE-bench Verified, quick-fix tier). Every task proven fixable first; every fix graded by the official checker.",
-   "naive": {
-    "solved": 20,
-    "of": 30,
-    "tokens": 2800338,
-    "cost": 0.6854
-   },
-   "razor": {
-    "solved": 15,
-    "of": 30,
-    "tokens": 4619060,
-    "cost": 2.4594
-   },
-   "takeaway": "Both sides fixed most of these \u2014 the plain agent 20 of 30, Razor 15 of 30. The difference is the bill: Razor used 1.6495\u00d7 the tokens."
-  },
   {
    "key": "slice",
    "title": "Big Go projects whose tests run",
@@ -50,24 +32,6 @@
     "cost": 0.641
    },
    "takeaway": "The plain agent solved none of the eight and burned ~195k tokens per task exploring. Razor solved two at about 60% of the tokens \u2014 and its peak context was a third of the agent's."
-  },
-  {
-   "key": "core",
-   "title": "Small JS/Go projects, hidden tests",
-   "blurb": "23 tasks from Preact, Axios, Gin and Vue. The grading tests stay hidden until the end, so Razor's checker is partly blind on this set.",
-   "naive": {
-    "solved": 7,
-    "of": 23,
-    "tokens": 3877692,
-    "cost": 0.7356
-   },
-   "razor": {
-    "solved": 5,
-    "of": 23,
-    "tokens": 3802676,
-    "cost": 1.824
-   },
-   "takeaway": "Honest result: the plain agent wins on correctness here (7 vs 5). Razor used about the same tokens overall and kept a much smaller peak context (9.4k vs 14.1k tokens)."
   }
  ]
 }

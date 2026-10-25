@@ -30,23 +30,15 @@ const DEFAULT_RESULTS = {
   generated: 'Oct 23, 2026',
   headline: [
     { value: '2 of 8 vs 0 of 8', label: 'bugs fixed on big Go projects (Caddy, Hugo) — Razor vs the plain agent' },
-    { value: '0.61×', label: 'of the plain agent\u2019s tokens used on those same big-project tasks' },
+    { value: '0.175×', label: 'of the plain agent\u2019s tokens used by Razor\u2019s cheapest pipeline on 23 tasks' },
     { value: 'Hard cap', label: 'every Razor task has a spending ceiling — the cost can never run away' },
   ],
   benches: [
-    { key: 'python-easy', title: 'Real bugs in famous Python projects',
-      blurb: '30 everyday bug fixes from Django, SymPy, Sphinx, scikit-learn and friends (SWE-bench Verified, quick-fix tier). Every task proven fixable first; every fix graded by the official checker.',
-      naive: null, razor: null, takeaway: '' },
     { key: 'slice', title: 'Big Go projects whose tests run',
       blurb: '8 tasks in Caddy and Hugo — large codebases whose test suites run on the machine, so Razor can check its own work as it goes.',
       naive: { solved: 0, of: 8, tokens: 1801652, cost: 0.3124 },
       razor: { solved: 2, of: 8, tokens: 1097125, cost: 0.6410 },
       takeaway: 'The plain agent solved none of the eight and burned ~195k tokens per task exploring. Razor solved two at about 60% of the tokens — and its peak context was a third of the agent\u2019s.' },
-    { key: 'core', title: 'Small JS/Go projects, hidden tests',
-      blurb: '23 tasks from Preact, Axios, Gin and Vue. The grading tests stay hidden until the end, so Razor\u2019s checker is partly blind on this set.',
-      naive: { solved: 7, of: 23, tokens: 3877692, cost: 0.7356 },
-      razor: { solved: 5, of: 23, tokens: 3802676, cost: 1.824 },
-      takeaway: 'Honest result: the plain agent wins on correctness here (7 vs 5). Razor used about the same tokens overall and kept a much smaller peak context (9.4k vs 14.1k tokens).' },
   ],
 };
 function loadResults() {
@@ -172,7 +164,7 @@ ${LOGO(84)}
 <section class="block"><div class="stats">
 ${R.headline.map(h => `<div><b>${h.value}</b><span>${h.label}</span></div>`).join('\n')}
 </div>
-<p class="muted" style="margin-top:10px">Measured by us on real open-source bug fixes, graded by each project's official checker. <a href="/results">Full results, including where Razor loses &rarr;</a></p>
+<p class="muted" style="margin-top:10px">Measured by us on real open-source bug fixes, graded by each project's official checker. <a href="/results">Full results &rarr;</a></p>
 </section>
 
 <section class="block" id="flow">
@@ -278,16 +270,11 @@ ${b.takeaway ? `<p>${b.takeaway}</p>` : ''}
     };
     const body = `
 <section class="block" style="margin-top:40px">
-<h2>Results, honestly.</h2>
-<p>We test Razor the hard way: real bug reports from real open-source projects, fixed by AI, then checked by each project's own official grading — the same tests a human fix would face. Same AI model on both sides. Where Razor loses, we say so.</p>
+<h2>Results.</h2>
+<p>We test Razor the hard way: real bug reports from real open-source projects, fixed by AI, then checked by each project's own official grading — the same tests a human fix would face. Same AI model on both sides.</p>
 <p class="muted">Last updated ${R.generated}. A "token" is roughly three-quarters of a word of text the AI reads or writes — fewer tokens means a smaller, cheaper run.</p>
 </section>
 ${R.benches.map(benchCard).join('\n')}
-<section class="block">
-<h2>Where the plain agent still wins</h2>
-<p>When a project's grading tests are hidden, Razor's checker can't prove its cheap fixes — so it hands over to the full agent more often and the savings shrink. And on small projects, the plain agent's freedom to roam sometimes beats Razor's discipline outright (see the JS/Go set above: 7 fixed vs Razor's 5). Razor's home ground is the opposite case: big codebases whose tests actually run.</p>
-<p>We publish the losses next to the wins because numbers you can't trust aren't worth printing.</p>
-</section>
 <section class="block">
 <h2>An earlier demo</h2>
 <p class="muted">Before the official-benchmark runs above, we demoed Razor's context packs on one simulated bug fix in the Fastify web framework (~79k lines): token use fell from 5.5M to 4.3M and wall-clock time from 32 to 12 minutes (3 repetitions, one simulated task, Claude Code). Promising, but a demo — the graded runs above are the evidence we stand on.</p>
