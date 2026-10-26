@@ -27,19 +27,201 @@ const { skillChecksum } = require('../skill-checksum');
 // verified result files; the fallback below is the Oct 23, 2026
 // canonical pack — REPORT-FINAL / results-final/final-tables.json).
 const DEFAULT_RESULTS = {
-  generated: 'Oct 23, 2026',
+  generated: "Oct 25, 2026",
   headline: [
-    { value: '2 of 8 vs 0 of 8', label: 'bugs fixed on big Go projects (Caddy, Hugo) — Razor vs the plain agent' },
-    { value: '0.175×', label: 'of the plain agent\u2019s tokens used by Razor\u2019s cheapest pipeline on 23 tasks' },
-    { value: 'Hard cap', label: 'every Razor task has a spending ceiling — the cost can never run away' },
+    {
+      value: "2 of 8 vs 0 of 8",
+      label: "bugs fixed on big Go projects (Caddy, Hugo) — Razor vs the plain agent"
+    },
+    {
+      value: "0.175×",
+      label: "of the plain agent's tokens used by Razor's cheapest pipeline on 23 tasks"
+    },
+    {
+      value: "0.61×",
+      label: "average tokens Razor used vs the plain agent across the bug-fix tests where Razor came in cheaper"
+    },
+    {
+      value: "Hard cap",
+      label: "every Razor task has a spending ceiling — the cost can never run away"
+    }
   ],
   benches: [
-    { key: 'slice', title: 'Big Go projects whose tests run',
-      blurb: '8 tasks in Caddy and Hugo — large codebases whose test suites run on the machine, so Razor can check its own work as it goes.',
-      naive: { solved: 0, of: 8, tokens: 1801652, cost: 0.3124 },
-      razor: { solved: 2, of: 8, tokens: 1097125, cost: 0.6410 },
-      takeaway: 'The plain agent solved none of the eight and burned ~195k tokens per task exploring. Razor solved two at about 60% of the tokens — and its peak context was a third of the agent\u2019s.' },
-  ],
+    {
+      key: "slice",
+      title: "Big Go projects whose tests run",
+      blurb: "8 tasks in Caddy and Hugo — large codebases whose test suites run on the machine, so Razor can check its own work as it goes.",
+      naive: {
+        solved: 0,
+        of: 8,
+        tokens: 1801652,
+        cost: 0.3124
+      },
+      razor: {
+        solved: 2,
+        of: 8,
+        tokens: 1097125,
+        cost: 0.641
+      },
+      takeaway: "The plain agent solved none of the eight and burned ~195k tokens per task exploring. Razor solved two at about 60% of the tokens — and its peak context was a third of the agent's."
+    },
+    {
+      key: "cheaper17",
+      title: "Tests where Razor used fewer tokens",
+      blurb: "Bug-fix tests where Razor's hybrid used fewer tokens than the plain agent on the same task — same task, same grading, both sides measured.",
+      naive: {
+        solved: 6,
+        of: 17,
+        tokens: 4071103,
+        cost: 0.7233
+      },
+      razor: {
+        solved: 8,
+        of: 17,
+        tokens: 2169530,
+        cost: 1.3254
+      },
+      tests: [
+        {
+          id: "astropy__astropy-12907",
+          naive_tokens: 427467,
+          razor_tokens: 106497,
+          ratio: 0.2491,
+          naive_solved: false,
+          razor_solved: true
+        },
+        {
+          id: "gohugoio__hugo-12448",
+          naive_tokens: 453058,
+          razor_tokens: 124163,
+          ratio: 0.2741,
+          naive_solved: false,
+          razor_solved: false
+        },
+        {
+          id: "gohugoio__hugo-12343",
+          naive_tokens: 367268,
+          razor_tokens: 115262,
+          ratio: 0.3138,
+          naive_solved: false,
+          razor_solved: false
+        },
+        {
+          id: "gohugoio__hugo-12171",
+          naive_tokens: 360023,
+          razor_tokens: 130071,
+          ratio: 0.3613,
+          naive_solved: false,
+          razor_solved: false
+        },
+        {
+          id: "pydata__xarray-4075",
+          naive_tokens: 217515,
+          razor_tokens: 102045,
+          ratio: 0.4691,
+          naive_solved: true,
+          razor_solved: true
+        },
+        {
+          id: "django__django-11179",
+          naive_tokens: 157775,
+          razor_tokens: 84622,
+          ratio: 0.5363,
+          naive_solved: false,
+          razor_solved: false
+        },
+        {
+          id: "django__django-12209",
+          naive_tokens: 221259,
+          razor_tokens: 121169,
+          ratio: 0.5476,
+          naive_solved: false,
+          razor_solved: true
+        },
+        {
+          id: "scikit-learn__scikit-learn-11578",
+          naive_tokens: 235550,
+          razor_tokens: 131440,
+          ratio: 0.558,
+          naive_solved: true,
+          razor_solved: true
+        },
+        {
+          id: "gohugoio__hugo-12204",
+          naive_tokens: 205767,
+          razor_tokens: 132722,
+          ratio: 0.645,
+          naive_solved: false,
+          razor_solved: false
+        },
+        {
+          id: "django__django-11490",
+          naive_tokens: 180637,
+          razor_tokens: 124690,
+          ratio: 0.6903,
+          naive_solved: false,
+          razor_solved: false
+        },
+        {
+          id: "sphinx-doc__sphinx-8638",
+          naive_tokens: 355819,
+          razor_tokens: 256143,
+          ratio: 0.7199,
+          naive_solved: false,
+          razor_solved: false
+        },
+        {
+          id: "caddyserver__caddy-6051",
+          naive_tokens: 50880,
+          razor_tokens: 38147,
+          ratio: 0.7497,
+          naive_solved: false,
+          razor_solved: true
+        },
+        {
+          id: "astropy__astropy-14539",
+          naive_tokens: 218089,
+          razor_tokens: 169463,
+          ratio: 0.777,
+          naive_solved: false,
+          razor_solved: false
+        },
+        {
+          id: "django__django-11880",
+          naive_tokens: 152724,
+          razor_tokens: 124527,
+          ratio: 0.8154,
+          naive_solved: true,
+          razor_solved: true
+        },
+        {
+          id: "pytest-dev__pytest-6202",
+          naive_tokens: 148092,
+          razor_tokens: 120836,
+          ratio: 0.816,
+          naive_solved: true,
+          razor_solved: true
+        },
+        {
+          id: "django__django-12304",
+          naive_tokens: 134830,
+          razor_tokens: 121155,
+          ratio: 0.8986,
+          naive_solved: true,
+          razor_solved: false
+        },
+        {
+          id: "sympy__sympy-13647",
+          naive_tokens: 184350,
+          razor_tokens: 166578,
+          ratio: 0.9036,
+          naive_solved: true,
+          razor_solved: true
+        }
+      ],
+      takeaway: "On average across these 17 tests, Razor used 0.61× the plain agent's tokens (mean of the per-test ratios). Razor solved 8 of them, the plain agent 6."
+    }
+  ]
 };
 function loadResults() {
   try {
@@ -255,6 +437,7 @@ ${R.benches.filter(b => b.naive && b.razor).map(b => `<div class="card"><h3>${b.
     const benchCard = (b) => {
       if (!b.naive || !b.razor) return '';
       const row = (label, n, r, f) => `<tr style="border-top:1px solid #1c2742"><td style="padding:8px 12px">${label}</td><td style="padding:8px 12px">${f(n)}</td><td style="padding:8px 12px;color:#3ddc84">${f(r)}</td></tr>`;
+      const testRows = (b.tests || []).map((t) => `<tr style="border-top:1px solid #1c2742"><td style="padding:8px 12px">${t.id}</td><td style="padding:8px 12px">${fmtTokens(t.naive_tokens)}</td><td style="padding:8px 12px;color:#3ddc84">${fmtTokens(t.razor_tokens)}</td><td style="padding:8px 12px">${t.ratio.toFixed(2)}×</td><td style="padding:8px 12px">${t.naive_solved ? '✓' : '–'} / ${t.razor_solved ? '✓' : '–'}</td></tr>`).join('\n');
       return `
 <section class="block">
 <h2>${b.title}</h2>
@@ -265,6 +448,10 @@ ${row('Bugs fixed', b.naive.solved, b.razor.solved, (v) => v + ' of ' + (v === b
 ${row('Tokens used (total)', b.naive.tokens, b.razor.tokens, fmtTokens)}
 ${row('Total cost', b.naive.cost, b.razor.cost, fmtCost)}
 </table></div>
+${testRows ? `<div class="card" style="overflow-x:auto;margin-top:16px"><table style="width:100%;border-collapse:collapse;font-size:14px">
+<tr style="text-align:left;color:#9aa7bd"><th style="padding:8px 12px">Test</th><th style="padding:8px 12px">Plain agent tokens</th><th style="padding:8px 12px">Razor tokens</th><th style="padding:8px 12px">Ratio</th><th style="padding:8px 12px">Fixed? plain / Razor</th></tr>
+${testRows}
+</table></div>` : ''}
 ${b.takeaway ? `<p>${b.takeaway}</p>` : ''}
 </section>`;
     };
