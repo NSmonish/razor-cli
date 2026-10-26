@@ -407,9 +407,9 @@ ${R.benches.filter(b => b.naive && b.razor).map(b => `<div class="card"><h3>${b.
 <div class="card"><h3>skeleton</h3><p class="muted">Signature-only view of one file: definitions with line numbers, no bodies.</p></div>
 <div class="card"><h3>module_brief</h3><p class="muted">Brief for one file or directory: skeleton plus import edges, or top files with their symbols.</p></div>
 </div>
-<p style="margin-top:16px">Attach it with one command (Claude Code):</p>
+<p style="margin-top:16px">Attach it in your agent:</p>
 <pre>claude mcp add razor -- npx -y github:NSmonish/razor-mcp</pre>
-<p class="muted">Works in Claude Code, Cursor, and VS Code. Code: <a href="https://github.com/NSmonish/razor-mcp">github.com/NSmonish/razor-mcp</a>. The MCP hands your agent locations — it does not fix bugs by itself; the pipeline above is what turns those locations into a verified fix.</p>
+<p class="muted">Claude Code command above. Codex, Gemini CLI, Cursor, VS Code, and Kiro use the same server with their own setup — <a href="/guide#mcp">per-client setup in the guide</a>. No API keys needed; it runs entirely on your machine and sends nothing about your repo anywhere. Code: <a href="https://github.com/NSmonish/razor-mcp">github.com/NSmonish/razor-mcp</a>. The MCP hands your agent locations — it does not fix bugs by itself; the pipeline above is what turns those locations into a verified fix.</p>
 </section>
 
 <section class="block">
@@ -558,11 +558,41 @@ ${R.benches.map(benchCard).join('\n')}
 <p><a class="btn primary" href="/results">See the measured results</a></p>
 </section>
 
-<section class="block">
+<section class="block" id="mcp">
 <h2>Use the static stage on its own (MCP)</h2>
-<p>The static analysis behind the Locate step above is also available on its own as an MCP server, for agents that already have their own fix loop: four read-only tools — <code>locate</code>, <code>map_repo</code>, <code>skeleton</code>, <code>module_brief</code> — running entirely on your machine.</p>
+<p>The static analysis behind the Locate step above is also available on its own as an MCP server, for agents that already have their own fix loop: four read-only tools — <code>locate</code>, <code>map_repo</code>, <code>skeleton</code>, <code>module_brief</code> — running entirely on your machine. No API keys needed; the same server works in every client below.</p>
+<p><b>Claude Code</b></p>
 <pre>claude mcp add razor -- npx -y github:NSmonish/razor-mcp</pre>
-<p class="muted">Code: <a href="https://github.com/NSmonish/razor-mcp">github.com/NSmonish/razor-mcp</a>. The MCP hands an agent locations; the pipeline in this guide is what turns locations into a verified fix.</p>
+<p><b>Codex</b></p>
+<pre>codex mcp add razor -- npx -y github:NSmonish/razor-mcp</pre>
+<p class="muted">Or by hand in <code>~/.codex/config.toml</code>:</p>
+<pre>[mcp_servers.razor]
+command = "npx"
+args = ["-y", "github:NSmonish/razor-mcp"]</pre>
+<p><b>Gemini CLI</b></p>
+<pre>gemini mcp add razor npx -y github:NSmonish/razor-mcp</pre>
+<p class="muted">Or by hand in <code>~/.gemini/settings.json</code>:</p>
+<pre>{
+  "mcpServers": {
+    "razor": {
+      "command": "npx",
+      "args": ["-y", "github:NSmonish/razor-mcp"]
+    }
+  }
+}</pre>
+<p><b>Cursor</b> — <code>.cursor/mcp.json</code> in the project, same <code>mcpServers</code> shape as Gemini above.</p>
+<p><b>VS Code</b> — <code>.vscode/mcp.json</code>, with one difference: the top-level key is <code>servers</code>, not <code>mcpServers</code>:</p>
+<pre>{
+  "servers": {
+    "razor": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "github:NSmonish/razor-mcp"]
+    }
+  }
+}</pre>
+<p><b>Kiro</b> — <code>.kiro/settings/mcp.json</code> in the workspace, same <code>mcpServers</code> shape as Gemini above.</p>
+<p class="muted">After editing a config file by hand, restart that client. The MCP hands an agent locations; the pipeline in this guide is what turns locations into a verified fix. Code: <a href="https://github.com/NSmonish/razor-mcp">github.com/NSmonish/razor-mcp</a>.</p>
 </section>
 
 <section class="cta-band">
