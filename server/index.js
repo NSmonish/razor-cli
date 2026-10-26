@@ -298,7 +298,7 @@ function layout({ title, active, origin, body }) {
 <body>
 <header class="nav"><div class="nav-inner">
 <a class="brand" href="/">${LOGO(32)}<span>Razor</span></a>
-<nav>${nav('/', 'Home', 'home')}${nav('/results', 'Results', 'results')}${nav('/start', 'How to use', 'start')}${nav('/guide', 'Guide', 'guide')}<a class="gh" href="https://github.com/NSmonish/razor-cli">GitHub</a></nav>
+<nav>${nav('/', 'Home', 'home')}${nav('/results', 'Results', 'results')}${nav('/start', 'How to use', 'start')}${nav('/guide', 'Guide', 'guide')}${nav('/#mcp', 'MCP', 'mcp')}<a class="gh" href="https://github.com/NSmonish/razor-cli">GitHub</a></nav>
 </div></header>
 <div class="wrap">${body}</div>
 <footer><div class="foot-grid">
@@ -396,6 +396,20 @@ ${R.headline.map(h => `<div><b>${h.value}</b><span>${h.label}</span></div>`).joi
 ${R.benches.filter(b => b.naive && b.razor).map(b => `<div class="card"><h3>${b.title}</h3><p class="muted">Plain agent: <b style="color:#e9eef7">${b.naive.solved} of ${b.naive.of}</b> fixed<br>Razor: <b style="color:#3ddc84">${b.razor.solved} of ${b.razor.of}</b> fixed, using ${fmtTokens(b.razor.tokens)} tokens vs ${fmtTokens(b.naive.tokens)}</p></div>`).join('\n')}
 </div>
 <p style="margin-top:16px"><a class="btn primary" href="/results">See all the results — including the losses</a></p>
+</section>
+
+<section class="block" id="mcp">
+<h2>Use the static analysis in your own agent</h2>
+<p>The static analysis behind the Locate step above is now available on its own as an MCP server. Any agent that speaks MCP can call it. It is read-only, runs entirely on your machine, and sends nothing about your repo anywhere.</p>
+<div class="grid3">
+<div class="card"><h3>locate</h3><p class="muted">Rank repo files for a bug report, from symbol names, paths, and import-graph rank. No LLM, deterministic.</p></div>
+<div class="card"><h3>map_repo</h3><p class="muted">Stack, file counts, and the PageRank-ordered file list, budgeted.</p></div>
+<div class="card"><h3>skeleton</h3><p class="muted">Signature-only view of one file: definitions with line numbers, no bodies.</p></div>
+<div class="card"><h3>module_brief</h3><p class="muted">Brief for one file or directory: skeleton plus import edges, or top files with their symbols.</p></div>
+</div>
+<p style="margin-top:16px">Attach it with one command (Claude Code):</p>
+<pre>claude mcp add razor -- npx -y github:NSmonish/razor-mcp</pre>
+<p class="muted">Works in Claude Code, Cursor, and VS Code. Code: <a href="https://github.com/NSmonish/razor-mcp">github.com/NSmonish/razor-mcp</a>. The MCP hands your agent locations — it does not fix bugs by itself; the pipeline above is what turns those locations into a verified fix.</p>
 </section>
 
 <section class="block">
@@ -542,6 +556,13 @@ ${R.benches.map(benchCard).join('\n')}
 <h2>Measured results</h2>
 <p>On a slice of large-repo tasks with runnable suites, Razor fixed 2 of 8 where the plain agent fixed 0, using 0.61&times; the plain agent's tokens. Across 17 bug-fix tests where Razor came in cheaper, it averaged 0.61&times; the plain agent's tokens and fixed 8 to the plain agent's 6.</p>
 <p><a class="btn primary" href="/results">See the measured results</a></p>
+</section>
+
+<section class="block">
+<h2>Use the static stage on its own (MCP)</h2>
+<p>The static analysis behind the Locate step above is also available on its own as an MCP server, for agents that already have their own fix loop: four read-only tools — <code>locate</code>, <code>map_repo</code>, <code>skeleton</code>, <code>module_brief</code> — running entirely on your machine.</p>
+<pre>claude mcp add razor -- npx -y github:NSmonish/razor-mcp</pre>
+<p class="muted">Code: <a href="https://github.com/NSmonish/razor-mcp">github.com/NSmonish/razor-mcp</a>. The MCP hands an agent locations; the pipeline in this guide is what turns locations into a verified fix.</p>
 </section>
 
 <section class="cta-band">
