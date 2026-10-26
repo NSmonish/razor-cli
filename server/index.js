@@ -342,7 +342,6 @@ function createApp(store, opts = {}) {
 ${LOGO(84)}
 <h1>Fix the bug. Skip the runaway bill.</h1>
 <p class="lede">Give Razor a bug report and it hands back a tested fix. It tries the cheap way first, proves the fix with the project's own tests, and only calls in a full AI agent when it has to — so the cost stays small, capped, and predictable.</p>
-${(() => { const b = R.benches.find(x => x.key === 'cheaper17'); return b && b.takeaway ? `<div class="banner">${b.takeaway.replace('0.61×', '<b>0.61×</b>')}</div>` : ''; })()}
 <div><a class="btn primary" href="/results">See the measured results</a><a class="btn" href="/start">How to use Razor</a></div>
 </section>
 
