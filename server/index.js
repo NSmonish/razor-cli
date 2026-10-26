@@ -298,11 +298,11 @@ function layout({ title, active, origin, body }) {
 <body>
 <header class="nav"><div class="nav-inner">
 <a class="brand" href="/">${LOGO(32)}<span>Razor</span></a>
-<nav>${nav('/', 'Home', 'home')}${nav('/results', 'Results', 'results')}${nav('/start', 'How to use', 'start')}${nav('/guide', 'Guide', 'guide')}${nav('/#mcp', 'MCP', 'mcp')}<a class="gh" href="https://github.com/NSmonish/razor-cli">GitHub</a></nav>
+<nav>${nav('/', 'Home', 'home')}${nav('/results', 'Results', 'results')}${nav('/guide', 'Guide', 'guide')}${nav('/#mcp', 'MCP', 'mcp')}<a class="gh" href="https://github.com/NSmonish/razor-cli">GitHub</a></nav>
 </div></header>
 <div class="wrap">${body}</div>
 <footer><div class="foot-grid">
-<div><h4>Product</h4><a href="/#problem">The problem</a><a href="/results">Measured results</a><a href="/start">How to use</a><a href="/guide">Full guide</a></div>
+<div><h4>Product</h4><a href="/#problem">The problem</a><a href="/results">Measured results</a><a href="/guide">Full guide</a></div>
 <div><h4>Resources</h4><a href="https://github.com/NSmonish/razor-cli">GitHub repo</a><a href="/health">Health check</a></div>
 <div><h4>Team</h4><a href="/#feedback">User feedback</a><span style="display:block;color:#9aa7bd;margin:6px 0">COMS E6998 — Build an Agent Startup</span><span style="display:block;color:#9aa7bd;margin:6px 0">Columbia University, Fall 2026</span></div>
 </div><div class="foot-bottom"><span>Razor — give your coding agent a teammate.</span></div></footer>
@@ -337,7 +337,7 @@ function createApp(store, opts = {}) {
 ${LOGO(84)}
 <h1>Fix the bug. Skip the runaway bill.</h1>
 <p class="lede">Give Razor a bug report and it hands back a tested fix. It tries the cheap way first, proves the fix with the project's own tests, and only calls in a full AI agent when it has to — so the cost stays small, capped, and predictable.</p>
-<div><a class="btn primary" href="/results">See the measured results</a><a class="btn" href="/start">How to use Razor</a></div>
+<div><a class="btn primary" href="/results">See the measured results</a><a class="btn" href="/guide">Read the guide</a></div>
 </section>
 
 <section class="block"><div class="stats">
@@ -470,47 +470,15 @@ ${R.benches.map(benchCard).join('\n')}
 </section>
 <section class="cta-band">
 <h2>Try it on your repo.</h2>
-<p>Three commands and your agent gets the guide — and the guardrails.</p>
-<a class="btn primary" href="/start">How to use Razor</a>
+<p>Attach the static stage to your agent — setup for every client is in the guide.</p>
+<a class="btn primary" href="/guide">Read the guide</a>
 </section>`;
     res.type('html').send(layout({ title: 'Results', active: 'results', origin, body }));
   });
 
-  // ---- How to use: the short version ----
-  app.get('/start', (req, res) => {
-    const origin = getOrigin(req);
-    const body = `
-<section class="block" style="margin-top:40px">
-<h2>How to use Razor</h2>
-<p class="muted">The three commands that matter. You need Node 18+ and any local repo. Full walkthrough in the <a href="/guide">guide</a>.</p>
-</section>
-
-<section class="block">
-<h2>1. Get Razor</h2>
-<pre><span class="p">$</span> git clone https://github.com/NSmonish/razor-cli ~/razor-cli
-<span class="p">$</span> cd ~/razor-cli && npm install</pre>
-<p class="muted">Optional: add a free Gemini API key in <code>.env</code> (<code>GEMINI_API_KEY=...</code>) for skill discovery and polish. Without one, Razor still produces the full grounded pack.</p>
-</section>
-
-<section class="block">
-<h2>2. Generate your repo's context pack</h2>
-<pre><span class="p">$</span> node index.js scaffold /path/to/your-repo -o /tmp/mypack</pre>
-<p>You get <code>AGENTS.md</code>, layered how-to docs, and a check script — all generated from evidence in your repo, nothing invented. Pick your agent's layout with <code>-t claude</code> or <code>-t kiro</code> (default fits Cursor, Codex and Copilot).</p>
-</section>
-
-<section class="block">
-<h2>3. Put it where your agent looks</h2>
-<pre><span class="p">$</span> cp -R /tmp/mypack/. /path/to/your-repo/</pre>
-<p>Open the repo in your coding agent and ask: <i>"What are this repo's conventions for running tests?"</i> If it answers with your pack's real commands, you're set.</p>
-</section>
-
-<section class="cta-band">
-<h2>Want the full walkthrough?</h2>
-<p>Per-agent activation steps and verification — in the guide.</p>
-<a class="btn primary" href="/guide">Read the full guide</a>
-</section>`;
-    res.type('html').send(layout({ title: 'How to use', active: 'start', origin, body }));
-  });
+  // ---- /start retired (Oct 26, 2026): merged into the guide. Old
+  // links and bookmarks land on the guide, same as /skills -> home.
+  app.get('/start', (req, res) => { res.redirect('/guide'); });
 
   // ---- Guide: launch Razor on your repo ----
   app.get('/guide', (req, res) => {
@@ -519,6 +487,7 @@ ${R.benches.map(benchCard).join('\n')}
 <section class="block" style="margin-top:40px">
 <h2>What Razor does now</h2>
 <p>Give Razor a bug report and it hands back a tested fix. It tries the cheap way first, proves the fix with the project's own tests, and only calls in a full AI agent when it has to — so the cost stays small, capped, and predictable.</p>
+<p><b>Try it now:</b> attach the static stage as an MCP server in your agent — setup for every client is in <a href="#mcp">the MCP section below</a>.</p>
 <p class="muted">This guide replaces the old context-pack manual, retired October 25, 2026. Razor no longer generates context packs.</p>
 </section>
 
