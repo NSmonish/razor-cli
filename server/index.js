@@ -274,13 +274,6 @@ section.block h2{font-size:29px;margin-bottom:12px;color:#fff}
 .quotes{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px}
 blockquote{border:1px solid #1c2742;border-left:4px solid #5b9dff;background:#101832;border-radius:0 12px 12px 0;padding:16px 18px;margin:0;font-size:14.5px;color:#d5deef}
 blockquote cite{display:block;margin-top:12px;font-style:normal;font-size:13px;color:#9aa7bd}
-.skill{background:#101832;border:1px solid #1c2742;border-radius:10px;padding:14px 18px;margin:12px 0;transition:border-color .15s}
-.skill:hover{border-color:#5b9dff}
-.skill h4{margin:0 0 4px;font-size:17px}.skill h4 .ver{font-weight:normal;color:#9aa7bd;font-size:13px}
-.skill .desc{margin:4px 0;color:#c3cede}.skill .tags{margin:8px 0}
-.skill .tag{display:inline-block;background:#182448;color:#9cc4ff;border-radius:10px;padding:1px 10px;margin:0 5px 5px 0;font-size:13px}
-.skill .pullcmd{position:relative}.skill .pullcmd button{position:absolute;top:8px;right:8px;font-size:12px;padding:4px 12px;border:1px solid #5b9dff;border-radius:7px;background:#0d1428;color:#fff;cursor:pointer}
-#skills-empty{color:#9aa7bd}
 .cta-band{background:linear-gradient(92deg,#16265c,#1f3864);border:1px solid #2c4a8f;border-radius:16px;padding:36px;text-align:center;margin:64px 0}
 .banner{border:1px solid #2c4a8f;background:linear-gradient(92deg,#16265c,#1f3864);border-radius:16px;padding:22px 26px;text-align:center;font-size:20px;font-weight:800;line-height:1.5;color:#fff;margin:26px 0}
 .banner b{color:#3ddc84}
@@ -510,128 +503,53 @@ ${R.benches.map(benchCard).join('\n')}
     const origin = getOrigin(req);
     const body = `
 <section class="block" style="margin-top:40px">
-<h2>Launch Razor on your repo</h2>
-<p class="muted">End to end: from zero to a published skill in about ten minutes. You need Node 18+.</p>
+<h2>What Razor does now</h2>
+<p>Give Razor a bug report and it hands back a tested fix. It tries the cheap way first, proves the fix with the project's own tests, and only calls in a full AI agent when it has to — so the cost stays small, capped, and predictable.</p>
+<p class="muted">This guide replaces the old context-pack manual, retired October 25, 2026. Razor no longer generates context packs.</p>
 </section>
 
 <section class="block">
-<h2>0. One-time setup</h2>
-<pre><span class="p">$</span> git clone https://github.com/NSmonish/razor-cli ~/razor-cli
-<span class="p">$</span> cd ~/razor-cli && npm install</pre>
-<p class="muted">Clone it anywhere you like and leave it there — you run Razor from this folder against any repo.</p>
-<p>Optional, for the LLM features (skill discovery + prose polish) — put a Gemini API key in <code>.env</code>:</p>
-<pre>GEMINI_API_KEY=your_key_here</pre>
-<p class="muted">Get a free key at <a href="https://aistudio.google.com/apikey">aistudio.google.com/apikey</a>. Without a key, Razor still runs and produces a full grounded pack — it just skips the LLM polish and discovery.</p>
+<h2>How a fix happens</h2>
+<div class="grid3">
+<div class="card"><span class="stepnum">1</span><h3>Issue</h3><p class="muted">A real bug report comes in.</p></div>
+<div class="card"><span class="stepnum">2</span><h3>Locate</h3><p class="muted">Razor points at the few files that probably hold the bug — and ignores everything else.</p></div>
+<div class="card"><span class="stepnum">3</span><h3>Try</h3><p class="muted">It makes a few quick, cheap fix attempts. Every attempt has a strict spending limit.</p></div>
+<div class="card"><span class="stepnum">4</span><h3>Check</h3><p class="muted">Each attempt runs against the project's own tests. A fix that passes and breaks nothing is done — cheaply.</p></div>
+<div class="card"><span class="stepnum">5</span><h3>Escalate</h3><p class="muted">No proven fix? A full AI agent takes over — starting from Razor's best attempt and notes, not from zero.</p></div>
+<div class="card"><span class="stepnum">6</span><h3>Patch out</h3><p class="muted">The best proven fix is the answer.</p></div>
+</div>
 </section>
 
 <section class="block">
-<h2>1. Get a repo to run on</h2>
-<pre><span class="p">$</span> git clone https://github.com/goldbergyoni/nodejs-testing-best-practices /tmp/myrepo</pre>
-<p class="muted">Or point Razor at any local repo path.</p>
+<h2>What you give it, what you get back</h2>
+<p><b>You give it</b> a bug report and the repo — ideally one where the test suite actually runs, since verification is the whole mechanism.</p>
+<p><b>You get back</b> a patch that passed the project's own tests, or a clear result when no attempt verified. Nothing ships unverified.</p>
 </section>
 
 <section class="block">
-<h2>2. Scan it <span class="muted" style="font-weight:normal">— optional sanity check</span></h2>
-<p>See what Razor detects, with evidence — which file proved each fact:</p>
-<pre><span class="p">$</span> node index.js scan /tmp/myrepo</pre>
-<p class="muted">Prints JSON: language, framework, testing, ORM, scripts, structure, plus an evidence map.</p>
+<h2>Why it costs less</h2>
+<p>Three things keep the bill down. First, the cheap attempts run before any full agent is involved, so easy fixes never pay agent prices. Second, escalation only happens when no cheap attempt verified — the expensive path is the exception, not the default. Third, every attempt has a hard spending cap, so a runaway bill is impossible by construction.</p>
+<p class="muted">The honest limit: the savings concentrate where the plain agent runs long or fails outright. Where the plain agent already solves a bug cheaply, the extra first pass costs more than it saves. That is why the next section matters.</p>
 </section>
 
 <section class="block">
-<h2>3. Generate the full context pack</h2>
-<pre><span class="p">$</span> node index.js scaffold /tmp/myrepo -o /tmp/mypack</pre>
-<p>This produces the whole pack in <code>/tmp/mypack/</code>: <code>AGENTS.md</code>, layered docs (overview, architecture, workflows, verification, steering), <code>skills/&lt;name&gt;/SKILL.md</code>, <code>scripts/check.sh</code>, and <code>skills.index.json</code>. With a Gemini key, it also discovers repo-specific skills and polishes the prose.</p>
-<p class="muted">This folder is a staging area — step 5 moves the pack into your repo so your agent actually picks it up.</p>
-<p>Pick the layout for your agent tool with <code>-t</code>:</p>
-<pre><span class="p">$</span> node index.js scaffold /tmp/myrepo -o /tmp/mypack -t agents-md   <span class="p">#</span> default: Cursor, Codex, Copilot (Gemini CLI: see step 5)
-<span class="p">$</span> node index.js scaffold /tmp/myrepo -o /tmp/mypack -t claude      <span class="p">#</span> skills under .claude/skills/
-<span class="p">$</span> node index.js scaffold /tmp/myrepo -o /tmp/mypack -t kiro        <span class="p">#</span> docs/skills under .kiro/</pre>
+<h2>The routing we're building now</h2>
+<p>A user runs Razor on any repo, not just the ones it wins on — so the product has to adapt per repo instead of assuming the good case. The gate checks two things that are observable in seconds, with no guesswork: how big the repo is, and whether its test suite runs. Big repo with a runnable suite → the full cheap-first pipeline, where the measured savings live. Small repo or unrunnable suite → straight through to the plain agent, at plain-agent cost, never worse.</p>
+<p class="muted">The bar for this design is simple: never worse anywhere, better where it counts.</p>
 </section>
 
 <section class="block">
-<h2>4. Look at what it generated</h2>
-<pre><span class="p">$</span> find /tmp/mypack -type f | sort
-<span class="p">$</span> cat /tmp/mypack/AGENTS.md</pre>
-<p>Or view it as an interactive HTML page — click files to see their content:</p>
-<pre><span class="p">$</span> node view_pack.js /tmp/mypack</pre>
-</section>
-
-<section class="block">
-<h2>5. Make your agent pick it up</h2>
-<p>Your agent only auto-discovers files <b>inside the repo it's working on</b> — so copy the pack from the staging folder into the repo root:</p>
-<pre><span class="p">$</span> cp -R /tmp/mypack/. /tmp/myrepo/</pre>
-<p>How each agent finds the pack:</p>
-<div class="card" style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:15px">
-<tr style="text-align:left;color:#9aa7bd"><th style="padding:8px 12px">Your agent</th><th style="padding:8px 12px">Scaffold with</th><th style="padding:8px 12px">How it picks up the pack</th></tr>
-<tr style="border-top:1px solid #1c2742"><td style="padding:8px 12px">Claude Code</td><td style="padding:8px 12px"><code>-t claude</code></td><td style="padding:8px 12px">Reads <code>AGENTS.md</code> at the repo root (v2.1.277+, when no <code>CLAUDE.md</code> exists); skills in <code>.claude/skills/</code> load on demand</td></tr>
-<tr style="border-top:1px solid #1c2742"><td style="padding:8px 12px">Cursor</td><td style="padding:8px 12px"><code>-t agents-md</code> (default)</td><td style="padding:8px 12px">Reads <code>AGENTS.md</code> at the repo root automatically</td></tr>
-<tr style="border-top:1px solid #1c2742"><td style="padding:8px 12px">Codex CLI</td><td style="padding:8px 12px"><code>-t agents-md</code> (default)</td><td style="padding:8px 12px">Reads <code>AGENTS.md</code> at the repo root automatically (its native format)</td></tr>
-<tr style="border-top:1px solid #1c2742"><td style="padding:8px 12px">GitHub Copilot</td><td style="padding:8px 12px"><code>-t agents-md</code> (default)</td><td style="padding:8px 12px">Reads <code>AGENTS.md</code> at the repo root automatically</td></tr>
-<tr style="border-top:1px solid #1c2742"><td style="padding:8px 12px">Gemini CLI</td><td style="padding:8px 12px"><code>-t agents-md</code> (default)</td><td style="padding:8px 12px">Add <code>@AGENTS.md</code> to your <code>GEMINI.md</code> (or configure it to read <code>AGENTS.md</code>) — it doesn't pick the file up on its own</td></tr>
-<tr style="border-top:1px solid #1c2742"><td style="padding:8px 12px">Kiro</td><td style="padding:8px 12px"><code>-t kiro</code></td><td style="padding:8px 12px">Steering docs in <code>.kiro/steering/</code> and skills in <code>.kiro/skills/</code> load automatically</td></tr>
-</table></div>
-<p class="muted">Scaffolded with the wrong layout? Just re-run with the right <code>-t</code> flag — it takes seconds. Claude Code note: if your repo already has a <code>CLAUDE.md</code>, it wins over <code>AGENTS.md</code> — add <code>@AGENTS.md</code> at the top of <code>CLAUDE.md</code> to load both.</p>
-<h3>Activate it step by step</h3>
-<p>Copying the files gets them in place — here's how to switch each tool onto the pack. Run every command from the repo root (<code>cd /tmp/myrepo</code>).</p>
-
-<p><b>Claude Code</b> <span class="muted">(scaffold with <code>-t claude</code>)</span></p>
-<ol>
-<li>Run <code>claude</code> — <code>AGENTS.md</code> loads automatically (needs v2.1.277+ and no <code>CLAUDE.md</code> present).</li>
-<li>Type <code>/skills</code> to confirm Razor's skills were discovered.</li>
-<li>Skills trigger on their own when your request matches, or call one directly: <code>/run-tests</code>.</li>
-</ol>
-
-<p><b>Cursor</b> <span class="muted">(default <code>-t agents-md</code>)</span></p>
-<ol>
-<li>Open the repo in Cursor — <code>AGENTS.md</code> is picked up automatically.</li>
-<li>Move the skills where Cursor looks: <code>mkdir -p .agents && mv skills .agents/skills</code>.</li>
-<li>Skills trigger automatically, or type <code>/</code> in Agent chat and pick one.</li>
-</ol>
-
-<p><b>Codex CLI</b> <span class="muted">(default <code>-t agents-md</code>)</span></p>
-<ol>
-<li>Run <code>codex</code> — <code>AGENTS.md</code> loads automatically.</li>
-<li>Move the skills where Codex looks: <code>mkdir -p .agents && mv skills .agents/skills</code>.</li>
-<li>Run <code>/skills</code> to confirm, then invoke with <code>$run-tests</code> — or just describe the task and let it match.</li>
-</ol>
-
-<p><b>Gemini CLI</b> <span class="muted">(default <code>-t agents-md</code>)</span></p>
-<ol>
-<li>Add <code>@AGENTS.md</code> to your <code>GEMINI.md</code> — Gemini doesn't pick up <code>AGENTS.md</code> on its own.</li>
-<li>Move the skills where Gemini looks: <code>mkdir -p .agents && mv skills .agents/skills</code>.</li>
-<li><code>/skills list</code> to confirm, <code>/skills reload</code> after changes. Gemini asks for confirmation before activating a skill the first time.</li>
-</ol>
-
-<p><b>GitHub Copilot CLI</b> <span class="muted">(default <code>-t agents-md</code>)</span></p>
-<ol>
-<li>Run <code>copilot</code> in the repo — <code>AGENTS.md</code> is picked up automatically (check with <code>/instructions</code>).</li>
-</ol>
-
-<p><b>Kiro CLI</b> <span class="muted">(scaffold with <code>-t kiro</code>)</span></p>
-<ol>
-<li>Run <code>kiro-cli</code> in the repo — steering docs in <code>.kiro/steering/</code> load automatically.</li>
-<li>Skills trigger on their own when your request matches, or type <code>/</code> and pick one (e.g. <code>/run-tests</code>).</li>
-<li>Optional: define a custom agent in <code>.kiro/agents/&lt;name&gt;.json</code>, then <code>/agent swap &lt;name&gt;</code> to switch to it.</li>
-</ol>
-
-<h3>Verify it's working</h3>
-<p>Open the repo in your agent and ask: <i>"What are this repo's conventions for running tests?"</i> If it answers with the pack's real commands, you're set. Then run the pack's own verification script from the repo root:</p>
-<pre><span class="p">$</span> cd /tmp/myrepo && bash scripts/check.sh</pre>
-</section>
-
-<section class="block">
-<h2>The minimal version</h2>
-<p>The three commands that matter:</p>
-<pre><span class="p">$</span> git clone &lt;repo-url&gt; /tmp/myrepo
-<span class="p">$</span> node index.js scaffold /tmp/myrepo -o /tmp/mypack
-<span class="p">$</span> cp -R /tmp/mypack/. /tmp/myrepo/      <span class="p">#</span> then open in your agent</pre>
+<h2>Measured results</h2>
+<p>On a slice of large-repo tasks with runnable suites, Razor fixed 2 of 8 where the plain agent fixed 0, using 0.61&times; the plain agent's tokens. Across 17 bug-fix tests where Razor came in cheaper, it averaged 0.61&times; the plain agent's tokens and fixed 8 to the plain agent's 6.</p>
+<p><a class="btn primary" href="/results">See the measured results</a></p>
 </section>
 
 <section class="cta-band">
-<h2>Your repo is one scan away.</h2>
-<p>Generate the pack and open it in your agent.</p>
-<a class="btn primary" href="/start">How to use Razor</a>
-</section>`;
+<h2>Want the numbers behind this?</h2>
+<p>Every test, both token counts, and both fix outcomes — on the results page.</p>
+<a class="btn primary" href="/results">See the measured results</a>
+</section>
+`;
     res.type('html').send(layout({ title: 'Guide', active: 'guide', origin, body }));
   });
 
