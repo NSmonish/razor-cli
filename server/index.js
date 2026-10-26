@@ -280,6 +280,8 @@ blockquote cite{display:block;margin-top:12px;font-style:normal;font-size:13px;c
 .skill .pullcmd{position:relative}.skill .pullcmd button{position:absolute;top:8px;right:8px;font-size:12px;padding:4px 12px;border:1px solid #5b9dff;border-radius:7px;background:#0d1428;color:#fff;cursor:pointer}
 #skills-empty{color:#9aa7bd}
 .cta-band{background:linear-gradient(92deg,#16265c,#1f3864);border:1px solid #2c4a8f;border-radius:16px;padding:36px;text-align:center;margin:64px 0}
+.banner{border:1px solid #2c4a8f;background:linear-gradient(92deg,#16265c,#1f3864);border-radius:16px;padding:22px 26px;text-align:center;font-size:20px;font-weight:800;line-height:1.5;color:#fff;margin:26px 0}
+.banner b{color:#3ddc84}
 .cta-band h2{margin:0 0 8px;color:#fff}
 .cta-band p{color:#b9c6e2;margin:0 0 20px}
 footer{border-top:1px solid #1c2742;margin-top:70px;padding:34px 0 46px;color:#9aa7bd;font-size:14px}
@@ -340,6 +342,7 @@ function createApp(store, opts = {}) {
 ${LOGO(84)}
 <h1>Fix the bug. Skip the runaway bill.</h1>
 <p class="lede">Give Razor a bug report and it hands back a tested fix. It tries the cheap way first, proves the fix with the project's own tests, and only calls in a full AI agent when it has to — so the cost stays small, capped, and predictable.</p>
+${(() => { const b = R.benches.find(x => x.key === 'cheaper17'); return b && b.takeaway ? `<div class="banner">${b.takeaway.replace('0.61×', '<b>0.61×</b>')}</div>` : ''; })()}
 <div><a class="btn primary" href="/results">See the measured results</a><a class="btn" href="/start">How to use Razor</a></div>
 </section>
 
@@ -452,10 +455,12 @@ ${testRows ? `<div class="card" style="overflow-x:auto;margin-top:16px"><table s
 <tr style="text-align:left;color:#9aa7bd"><th style="padding:8px 12px">Test</th><th style="padding:8px 12px">Plain agent tokens</th><th style="padding:8px 12px">Razor tokens</th><th style="padding:8px 12px">Ratio</th><th style="padding:8px 12px">Fixed? plain / Razor</th></tr>
 ${testRows}
 </table></div>` : ''}
-${b.takeaway ? `<p>${b.takeaway}</p>` : ''}
+${(b.key === 'cheaper17' ? '' : (b.takeaway ? `<p>${b.takeaway}</p>` : ''))}
 </section>`;
     };
+    const bannerBench = R.benches.find(x => x.key === 'cheaper17');
     const body = `
+${bannerBench && bannerBench.takeaway ? `<section class="block" style="margin-top:40px"><div class="banner">${bannerBench.takeaway.replace('0.61×', '<b>0.61×</b>')}</div></section>` : ''}
 <section class="block" style="margin-top:40px">
 <h2>Results.</h2>
 <p>We test Razor the hard way: real bug reports from real open-source projects, fixed by AI, then checked by each project's own official grading — the same tests a human fix would face. Same AI model on both sides.</p>
