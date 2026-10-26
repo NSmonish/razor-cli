@@ -1,10 +1,12 @@
-// Razor skill registry — minimal cloud hub so a team can publish generated
-// skills and pull them into any workspace. REST + multi-page site.
+// Razor site — measured bug-fix results plus the product pages.
+// (Skills retired Oct 25, 2026: the new Razor generates no skills, so the
+// /skills page redirects home. The /api/skills endpoints remain for now;
+// the service stays up because it also serves this site.)
 //
 // endpoints:
 //   GET  /                      home (product story)
 //   GET  /guide                 how to launch Razor on your repo
-//   GET  /skills                published skills (live, with pull commands)
+//   GET  /skills                redirects home (skills retired)
 //   GET  /health                liveness probe (for the host)
 //   GET  /api/skills            list/search (?namespace=&q=)
 //   GET  /api/skills/:ns/:name  pull one skill (full, with files)
@@ -298,19 +300,19 @@ function layout({ title, active, origin, body }) {
     `<a href="${href}" class="${active === key ? 'active' : ''}">${label}</a>`;
   return `<!doctype html><html><head><meta charset="utf-8">
 <title>${title} — Razor</title><meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="description" content="Razor scans your repository and generates right-sized, token-efficient agent context packs.">
+<meta name="description" content="Razor fixes real bugs at a fraction of the plain agent's tokens, verified by each project's own tests.">
 <style>${CSS}</style></head>
 <body>
 <header class="nav"><div class="nav-inner">
 <a class="brand" href="/">${LOGO(32)}<span>Razor</span></a>
-<nav>${nav('/', 'Home', 'home')}${nav('/results', 'Results', 'results')}${nav('/start', 'How to use', 'start')}${nav('/guide', 'Guide', 'guide')}${nav('/skills', 'Skills', 'skills')}<a class="gh" href="https://github.com/NSmonish/razor-cli">GitHub</a></nav>
+<nav>${nav('/', 'Home', 'home')}${nav('/results', 'Results', 'results')}${nav('/start', 'How to use', 'start')}${nav('/guide', 'Guide', 'guide')}<a class="gh" href="https://github.com/NSmonish/razor-cli">GitHub</a></nav>
 </div></header>
 <div class="wrap">${body}</div>
 <footer><div class="foot-grid">
-<div><h4>Product</h4><a href="/#problem">The problem</a><a href="/results">Measured results</a><a href="/start">How to use</a><a href="/guide">Full guide</a><a href="/skills">Skill registry</a></div>
-<div><h4>Resources</h4><a href="https://github.com/NSmonish/razor-cli">GitHub repo</a><a href="/api/skills">Registry API</a><a href="/health">Health check</a></div>
+<div><h4>Product</h4><a href="/#problem">The problem</a><a href="/results">Measured results</a><a href="/start">How to use</a><a href="/guide">Full guide</a></div>
+<div><h4>Resources</h4><a href="https://github.com/NSmonish/razor-cli">GitHub repo</a><a href="/health">Health check</a></div>
 <div><h4>Team</h4><a href="/#feedback">User feedback</a><span style="display:block;color:#9aa7bd;margin:6px 0">COMS E6998 — Build an Agent Startup</span><span style="display:block;color:#9aa7bd;margin:6px 0">Columbia University, Fall 2026</span></div>
-</div><div class="foot-bottom"><span>Razor — give your coding agent a teammate.</span><span>Registry: ${origin}</span></div></footer>
+</div><div class="foot-bottom"><span>Razor — give your coding agent a teammate.</span></div></footer>
 </body></html>`;
 }
 
@@ -375,17 +377,6 @@ ${R.headline.map(h => `<div><b>${h.value}</b><span>${h.label}</span></div>`).joi
 <p>Hand-written or LLM-generated AGENTS.md files were supposed to fix this — but research shows generated repo-wide context files <i>lower</i> task success while raising cost. So developers hand-maintain instruction files that nobody keeps up to date.</p>
 </section>
 
-<section class="block">
-<h2>The toolkit: context packs for your agent</h2>
-<p class="muted">Razor also writes the guide your coding agent follows day-to-day — a right-sized context pack generated from your repo, shareable through this registry.</p>
-<div class="grid3">
-<div class="card"><span class="stepnum">1</span><h3>Scan</h3><p class="muted">Razor scans your repo — framework, ORM, test runner, scripts, structure — and captures evidence for every detection.</p></div>
-<div class="card"><span class="stepnum">2</span><h3>Publish</h3><p class="muted">Share the generated skills with your team on the <a href="/skills">skill registry</a>.</p></div>
-<div class="card"><span class="stepnum">3</span><h3>Pull</h3><p class="muted">Anyone pulls just the skill they need, straight into their workspace. No regeneration.</p></div>
-</div>
-<p style="margin-top:16px"><a class="btn primary" href="/guide">Read the full guide</a></p>
-</section>
-
 <section class="block" id="feedback">
 <h2>What users say</h2>
 <div class="quotes">
@@ -418,7 +409,7 @@ ${R.benches.filter(b => b.naive && b.razor).map(b => `<div class="card"><h3>${b.
 <h2>Questions, answered</h2>
 <div class="grid3">
 <div class="card"><h3>Does Razor do the coding?</h3><p class="muted">No — your coding agent does. Razor writes the guide it follows.</p></div>
-<div class="card"><h3>Can we inspect the output?</h3><p class="muted">Yes. The guidance is plain readable files: AGENTS.md, topic docs, skills, and check scripts.</p></div>
+<div class="card"><h3>Can we inspect the output?</h3><p class="muted">Yes. The guidance is plain readable files: AGENTS.md, topic docs, and check scripts.</p></div>
 <div class="card"><h3>Have you measured savings?</h3><p class="muted">Early results above are promising. We are designing proper trials to measure tokens, context, and time rigorously.</p></div>
 <div class="card"><h3>How do we try it?</h3><p class="muted">Give us 20 minutes: show us a recent task, where you corrected the agent, and what instructions you use. Contact: lc4008@columbia.edu</p></div>
 </div>
@@ -429,7 +420,7 @@ ${R.benches.filter(b => b.naive && b.razor).map(b => `<div class="card"><h3>${b.
 <p>Generate a context pack for your repo in under a minute.</p>
 <a class="btn primary" href="/guide">Get started</a>
 </section>`;
-    res.type('html').send(layout({ title: 'Skill Registry', active: 'home', origin, body }));
+    res.type('html').send(layout({ title: 'Home', active: 'home', origin, body }));
   });
 
   // ---- Results: verified numbers, plain language ----
@@ -497,7 +488,7 @@ ${R.benches.map(benchCard).join('\n')}
 <section class="block">
 <h2>2. Generate your repo's context pack</h2>
 <pre><span class="p">$</span> node index.js scaffold /path/to/your-repo -o /tmp/mypack</pre>
-<p>You get <code>AGENTS.md</code>, layered how-to docs, ready-to-use skills, and a check script — all generated from evidence in your repo, nothing invented. Pick your agent's layout with <code>-t claude</code> or <code>-t kiro</code> (default fits Cursor, Codex and Copilot).</p>
+<p>You get <code>AGENTS.md</code>, layered how-to docs, and a check script — all generated from evidence in your repo, nothing invented. Pick your agent's layout with <code>-t claude</code> or <code>-t kiro</code> (default fits Cursor, Codex and Copilot).</p>
 </section>
 
 <section class="block">
@@ -506,16 +497,9 @@ ${R.benches.map(benchCard).join('\n')}
 <p>Open the repo in your coding agent and ask: <i>"What are this repo's conventions for running tests?"</i> If it answers with your pack's real commands, you're set.</p>
 </section>
 
-<section class="block">
-<h2>Share skills with your team</h2>
-<pre><span class="p">$</span> node index.js publish /tmp/mypack --registry ${origin} --namespace your-team
-<span class="p">$</span> node index.js pull your-team/run-tests --registry ${origin} -o /tmp/mypack</pre>
-<p class="muted">Browse what's already published on the <a href="/skills">skills page</a>.</p>
-</section>
-
 <section class="cta-band">
 <h2>Want the full walkthrough?</h2>
-<p>Per-agent activation steps, verification, and add-a-skill — in the guide.</p>
+<p>Per-agent activation steps and verification — in the guide.</p>
 <a class="btn primary" href="/guide">Read the full guide</a>
 </section>`;
     res.type('html').send(layout({ title: 'How to use', active: 'start', origin, body }));
@@ -636,21 +620,6 @@ ${R.benches.map(benchCard).join('\n')}
 </section>
 
 <section class="block">
-<h2>6. Share skills via the cloud hub <span class="muted" style="font-weight:normal">— optional</span></h2>
-<p>Publish the pack's skills so teammates can reuse them:</p>
-<pre><span class="p">$</span> node index.js publish /tmp/mypack --registry ${origin} --namespace your-team</pre>
-<p>Pull a skill on another machine:</p>
-<pre><span class="p">$</span> node index.js pull your-team/run-tests --registry ${origin} -o /tmp/mypack</pre>
-<p class="muted">Browse what's published: <a href="/api/skills">/api/skills</a> · <a href="/skills">Skills page</a></p>
-</section>
-
-<section class="block">
-<h2>7. Add a specific skill later <span class="muted" style="font-weight:normal">— optional</span></h2>
-<pre><span class="p">$</span> node index.js add-skill db-migrations /tmp/myrepo -o /tmp/mypack</pre>
-<p class="muted">Known skills: run-tests, lint-fix, code-push, db-migrations, local-env, build.</p>
-</section>
-
-<section class="block">
 <h2>The minimal version</h2>
 <p>The three commands that matter:</p>
 <pre><span class="p">$</span> git clone &lt;repo-url&gt; /tmp/myrepo
@@ -660,52 +629,18 @@ ${R.benches.map(benchCard).join('\n')}
 
 <section class="cta-band">
 <h2>Your repo is one scan away.</h2>
-<p>Generate the pack, publish the skills, share the pull command.</p>
-<a class="btn primary" href="/skills">See published skills</a>
+<p>Generate the pack and open it in your agent.</p>
+<a class="btn primary" href="/start">How to use Razor</a>
 </section>`;
     res.type('html').send(layout({ title: 'Guide', active: 'guide', origin, body }));
   });
 
 
-  // ---- Skills: live team registry ----
-  app.get('/skills', (req, res) => {
-    const origin = getOrigin(req);
-    const body = `
-<section class="block" style="margin-top:40px">
-<h2>Team skills</h2>
-<p class="muted">Every skill published to this registry, live. Click <b>Copy</b> on any card to get its pull command.</p>
-<div id="skills"><p id="skills-empty">Loading…</p></div>
-<p class="muted">Raw JSON: <a href="/api/skills">/api/skills</a> · Publish yours: <a href="/guide">read the guide</a></p>
-</section>
-<script>
-var ORIGIN = ${JSON.stringify(origin)};
-function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
-function render(skills){
-  var box=document.getElementById('skills');
-  if(!skills.length){box.innerHTML='<p id="skills-empty">No skills published yet — <a href="/guide">publish the first one</a>.</p>';return;}
-  box.innerHTML=skills.map(function(s){
-    var full=esc(s.namespace)+'/'+esc(s.name);
-    var cmd='node index.js pull '+s.namespace+'/'+s.name+' --registry '+ORIGIN+' -o .agent';
-    var tags=(s.triggers||[]).slice(0,8).map(function(t){return '<span class="tag">'+esc(t)+'</span>';}).join('');
-    return '<div class="skill"><h4><code>'+full+'</code> <span class="ver">v'+esc(s.version||'1')+'</span></h4>'
-      +(s.description?'<p class="desc">'+esc(s.description)+'</p>':'')
-      +(tags?'<div class="tags">'+tags+'</div>':'')
-      +'<div class="pullcmd"><pre>'+esc(cmd)+'</pre><button onclick="copyCmd(this)">Copy</button></div></div>';
-  }).join('');
-}
-function copyCmd(btn){
-  var cmd=btn.parentElement.querySelector('pre').textContent;
-  if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(cmd).then(function(){btn.textContent='Copied!';setTimeout(function(){btn.textContent='Copy';},1500);});}
-  else{var t=document.createElement('textarea');t.value=cmd;document.body.appendChild(t);t.select();try{document.execCommand('copy');btn.textContent='Copied!';}catch(e){}document.body.removeChild(t);setTimeout(function(){btn.textContent='Copy';},1500);}
-}
-async function load(){
-  try{var r=await fetch('/api/skills');var d=await r.json();render(d.skills||[]);}
-  catch(e){document.getElementById('skills').innerHTML='<p id="skills-empty">Could not load skills.</p>';}
-}
-load();setInterval(load,30000);
-</script>`;
-    res.type('html').send(layout({ title: 'Skills', active: 'skills', origin, body }));
-  });
+  // ---- Skills page retired (Oct 25, 2026): the new Razor generates no
+  // skills, so /skills redirects home. The /api/skills endpoints below
+  // remain for now; the service itself stays up because it also serves
+  // this site.
+  app.get('/skills', (req, res) => { res.redirect('/'); });
 
   app.get('/api/skills', async (req, res) => {
     try {
