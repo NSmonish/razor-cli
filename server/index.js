@@ -195,6 +195,10 @@ section.block h2{font-size:29px;margin-bottom:12px;color:#fff}
 .card b{color:#7fd4ff}
 .card h3{margin:0 0 6px;font-size:17px}
 .stepnum{display:inline-block;background:linear-gradient(92deg,#3b7de9,#5b9dff);color:#fff;font-weight:700;border-radius:50%;width:30px;height:30px;line-height:30px;text-align:center;margin-bottom:8px;font-size:15px}
+.cmd{position:relative}
+.cmd pre{padding-right:88px}
+.copy{position:absolute;top:10px;right:10px;background:#1a2340;border:1px solid #5b9dff;color:#fff;border-radius:8px;padding:5px 12px;font-size:13px;cursor:pointer}
+.copy:hover{filter:brightness(1.2)}
 .quotes{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px}
 blockquote{border:1px solid #1c2742;border-left:4px solid #5b9dff;background:#101832;border-radius:0 12px 12px 0;padding:16px 18px;margin:0;font-size:14.5px;color:#d5deef}
 blockquote cite{display:block;margin-top:12px;font-style:normal;font-size:13px;color:#9aa7bd}
@@ -211,6 +215,10 @@ footer{border-top:1px solid #1c2742;margin-top:70px;padding:34px 0 46px;color:#9
 .foot-bottom{max-width:1080px;margin:26px auto 0;padding:18px 20px 0;border-top:1px solid #1c2742;display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px}
 @media(max-width:640px){.hero h1{font-size:34px}.stats{flex-direction:column}}
 `;
+
+const COPYJS = `<script>
+function copyCmd(btn){var t=document.getElementById(btn.getAttribute('data-copy'));if(!t)return;var s=t.innerText||t.textContent;function done(){btn.textContent='Copied';setTimeout(function(){btn.textContent='Copy';},1500);}if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(s).then(done);}else{var ta=document.createElement('textarea');ta.value=s;document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}document.body.removeChild(ta);done();}}
+</script>`;
 
 function layout({ title, active, origin, body }) {
   const nav = (href, label, key) =>
@@ -230,6 +238,7 @@ function layout({ title, active, origin, body }) {
 <div><h4>Resources</h4><a href="https://github.com/NSmonish/razor-cli">GitHub repo</a><a href="/health">Health check</a></div>
 <div><h4>Team</h4><a href="/#feedback">User feedback</a><span style="display:block;color:#9aa7bd;margin:6px 0">COMS E6998 — Build an Agent Startup</span><span style="display:block;color:#9aa7bd;margin:6px 0">Columbia University, Fall 2026</span></div>
 </div><div class="foot-bottom"><span>Razor — give your coding agent a teammate.</span></div></footer>
+${COPYJS}
 </body></html>`;
 }
 
@@ -323,17 +332,22 @@ ${R.benches.filter(b => b.naive && b.razor).map(b => `<div class="card"><h3>${b.
 </section>
 
 <section class="block" id="mcp">
-<h2>Use the static analysis in your own agent</h2>
-<p>The static analysis behind the Locate step above is now available on its own as an MCP server. Any agent that speaks MCP can call it. It is read-only, runs entirely on your machine, and sends nothing about your repo anywhere.</p>
+<h2>Set it up in your agent in 2 minutes</h2>
+<p>The MCP server gives your agent five tools. The one that matters most is <b>razor_fix</b>: give it a repo and a bug, and it runs the Step 3 loop and returns a patch only if the tests pass. The other four hand your agent locations to work from. Everything runs on your machine.</p>
 <div class="grid3">
+<div class="card"><h3>razor_fix</h3><p class="muted">Fix one bug: runs the Step 3 loop, returns a patch only if the tests pass. Uses your OpenAI key, capped at $0.50 a fix.</p></div>
 <div class="card"><h3>locate</h3><p class="muted">Rank repo files for a bug report, from symbol names, paths, and import-graph rank. No LLM, deterministic.</p></div>
 <div class="card"><h3>map_repo</h3><p class="muted">Stack, file counts, and the PageRank-ordered file list, budgeted.</p></div>
 <div class="card"><h3>skeleton</h3><p class="muted">Signature-only view of one file: definitions with line numbers, no bodies.</p></div>
 <div class="card"><h3>module_brief</h3><p class="muted">Brief for one file or directory: skeleton plus import edges, or top files with their symbols.</p></div>
 </div>
-<p style="margin-top:16px">Attach it in your agent:</p>
-<pre>claude mcp add razor -- npx -y github:NSmonish/razor-mcp</pre>
-<p class="muted">Claude Code command above. Codex, Gemini CLI, Cursor, VS Code, and Kiro use the same server with their own setup — <a href="/guide#mcp">per-client setup in the guide</a>. No API keys needed; it runs entirely on your machine and sends nothing about your repo anywhere. Code: <a href="https://github.com/NSmonish/razor-mcp">github.com/NSmonish/razor-mcp</a>. The MCP hands your agent locations — it does not fix bugs by itself; the pipeline above is what turns those locations into a verified fix.</p>
+<p style="margin-top:20px"><span class="stepnum">1</span> <b>Put your OpenAI key in your shell</b> (it never goes in a file):</p>
+<div class="cmd"><pre id="cmd-key">export OPENAI_API_KEY=sk-your-key</pre><button class="copy" data-copy="cmd-key" onclick="copyCmd(this)">Copy</button></div>
+<p><span class="stepnum">2</span> <b>Attach the server</b> (Claude Code; the key stays out of your history and your config):</p>
+<div class="cmd"><pre id="cmd-add">claude mcp add razor -e OPENAI_API_KEY='\${OPENAI_API_KEY}' -- npx -y github:NSmonish/razor-mcp</pre><button class="copy" data-copy="cmd-add" onclick="copyCmd(this)">Copy</button></div>
+<p><span class="stepnum">3</span> <b>Ask your agent to fix a bug:</b></p>
+<div class="cmd"><pre id="cmd-ask">Use razor_fix on this repo to fix: the login form accepts an empty password</pre><button class="copy" data-copy="cmd-ask" onclick="copyCmd(this)">Copy</button></div>
+<p class="muted">Other clients (Codex, Gemini CLI, Cursor, VS Code, Kiro) use the same server — <a href="/guide#mcp">per-client setup in the guide</a>, with the key in the config's <code>env</code> block. The four read-only tools need no key. Code: <a href="https://github.com/NSmonish/razor-mcp">github.com/NSmonish/razor-mcp</a>.</p>
 </section>
 
 <section class="block">
@@ -455,9 +469,9 @@ ${R.benches.map(benchCard).join('\n')}
 
 <section class="block" id="mcp">
 <h2>Use the static stage on its own (MCP)</h2>
-<p>The static analysis behind the Locate step above is also available on its own as an MCP server, for agents that already have their own fix loop: four read-only tools — <code>locate</code>, <code>map_repo</code>, <code>skeleton</code>, <code>module_brief</code> — running entirely on your machine. No API keys needed; the same server works in every client below.</p>
-<p><b>Claude Code</b></p>
-<pre>claude mcp add razor -- npx -y github:NSmonish/razor-mcp</pre>
+<p>The MCP server gives your agent five tools: <code>razor_fix</code>, which fixes one bug and returns a patch only if the tests pass, plus four read-only tools — <code>locate</code>, <code>map_repo</code>, <code>skeleton</code>, <code>module_brief</code> — running entirely on your machine. The read-only tools need no key. <code>razor_fix</code> needs your OpenAI key, put in your shell first (<code>export OPENAI_API_KEY=sk-your-key</code>) and passed through the config's <code>env</code> block, so it never lands in a file. The same server works in every client below.</p>
+<p><b>Claude Code</b> (one command, key included safely):</p>
+<div class="cmd"><pre id="cmd-guide-add">claude mcp add razor -e OPENAI_API_KEY='\${OPENAI_API_KEY}' -- npx -y github:NSmonish/razor-mcp</pre><button class="copy" data-copy="cmd-guide-add" onclick="copyCmd(this)">Copy</button></div>
 <p><b>Codex</b></p>
 <pre>codex mcp add razor -- npx -y github:NSmonish/razor-mcp</pre>
 <p class="muted">Or by hand in <code>~/.codex/config.toml</code>:</p>
@@ -466,15 +480,16 @@ command = "npx"
 args = ["-y", "github:NSmonish/razor-mcp"]</pre>
 <p><b>Gemini CLI</b></p>
 <pre>gemini mcp add razor npx -y github:NSmonish/razor-mcp</pre>
-<p class="muted">Or by hand in <code>~/.gemini/settings.json</code>:</p>
-<pre>{
+<p class="muted">Or by hand in <code>~/.gemini/settings.json</code> (copy the whole block):</p>
+<div class="cmd"><pre id="cmd-guide-json">{
   "mcpServers": {
     "razor": {
       "command": "npx",
-      "args": ["-y", "github:NSmonish/razor-mcp"]
+      "args": ["-y", "github:NSmonish/razor-mcp"],
+      "env": { "OPENAI_API_KEY": "\${OPENAI_API_KEY}" }
     }
   }
-}</pre>
+}</pre><button class="copy" data-copy="cmd-guide-json" onclick="copyCmd(this)">Copy</button></div>
 <p><b>Cursor</b> — <code>.cursor/mcp.json</code> in the project, same <code>mcpServers</code> shape as Gemini above.</p>
 <p><b>VS Code</b> — <code>.vscode/mcp.json</code>, with one difference: the top-level key is <code>servers</code>, not <code>mcpServers</code>:</p>
 <pre>{
@@ -482,12 +497,13 @@ args = ["-y", "github:NSmonish/razor-mcp"]</pre>
     "razor": {
       "type": "stdio",
       "command": "npx",
-      "args": ["-y", "github:NSmonish/razor-mcp"]
+      "args": ["-y", "github:NSmonish/razor-mcp"],
+      "env": { "OPENAI_API_KEY": "\${OPENAI_API_KEY}" }
     }
   }
 }</pre>
 <p><b>Kiro</b> — <code>.kiro/settings/mcp.json</code> in the workspace, same <code>mcpServers</code> shape as Gemini above.</p>
-<p class="muted">After editing a config file by hand, restart that client. The MCP hands an agent locations; the pipeline in this guide is what turns locations into a verified fix. Code: <a href="https://github.com/NSmonish/razor-mcp">github.com/NSmonish/razor-mcp</a>.</p>
+<p class="muted">After editing a config file by hand, restart that client. Then ask your agent to fix a bug with <code>razor_fix</code>; it returns a patch only if the tests pass, capped at $0.50 a fix. Code: <a href="https://github.com/NSmonish/razor-mcp">github.com/NSmonish/razor-mcp</a>.</p>
 </section>
 
 <section class="cta-band">
