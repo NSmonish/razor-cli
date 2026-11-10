@@ -333,9 +333,10 @@ ${R.benches.filter(b => b.naive && b.razor).map(b => `<div class="card"><h3>${b.
 
 <section class="block" id="mcp">
 <h2>Set it up in your agent in 2 minutes</h2>
-<p>The MCP server gives your agent five tools. The one that matters most is <b>razor_fix</b>: give it a repo and a bug, and it runs the Step 3 loop and returns a patch only if the tests pass. The other four hand your agent locations to work from. Everything runs on your machine.</p>
+<p>The MCP server gives your agent six tools. The one that matters most is <b>razor_fix</b>: give it a repo and a bug, and it runs the Step 3 loop and returns a patch only if the tests pass. The other four hand your agent locations to work from. And <b>razor_compare</b> runs one bug twice, plain loop vs Step 3, and shows you the tokens and cost side by side, so you can see for yourself how much you save. Everything runs on your machine.</p>
 <div class="grid3">
 <div class="card"><h3>razor_fix</h3><p class="muted">Fix one bug: runs the Step 3 loop, returns a patch only if the tests pass. Uses your OpenAI key, capped at $0.50 a fix.</p></div>
+<div class="card"><h3>razor_compare</h3><p class="muted">Run one bug twice, plain loop vs Step 3: tokens, cost, and who solved, side by side. Uses your OpenAI key, capped at $1.00 a pair.</p></div>
 <div class="card"><h3>locate</h3><p class="muted">Rank repo files for a bug report, from symbol names, paths, and import-graph rank. No LLM, deterministic.</p></div>
 <div class="card"><h3>map_repo</h3><p class="muted">Stack, file counts, and the PageRank-ordered file list, budgeted.</p></div>
 <div class="card"><h3>skeleton</h3><p class="muted">Signature-only view of one file: definitions with line numbers, no bodies.</p></div>
@@ -347,7 +348,9 @@ ${R.benches.filter(b => b.naive && b.razor).map(b => `<div class="card"><h3>${b.
 <div class="cmd"><pre id="cmd-add">claude mcp add razor -e OPENAI_API_KEY='\${OPENAI_API_KEY}' -- npx -y github:NSmonish/razor-mcp</pre><button class="copy" data-copy="cmd-add" onclick="copyCmd(this)">Copy</button></div>
 <p><span class="stepnum">3</span> <b>Ask your agent to fix a bug:</b></p>
 <div class="cmd"><pre id="cmd-ask">Use razor_fix on this repo to fix: the login form accepts an empty password</pre><button class="copy" data-copy="cmd-ask" onclick="copyCmd(this)">Copy</button></div>
-<p class="muted">Other clients (Codex, Gemini CLI, Cursor, VS Code, Kiro) use the same server — <a href="/guide#mcp">per-client setup in the guide</a>, with the key in the config's <code>env</code> block. The four read-only tools need no key. Code: <a href="https://github.com/NSmonish/razor-mcp">github.com/NSmonish/razor-mcp</a>.</p>
+<p><b>See for yourself how much you save:</b> ask for a comparison on your own bug instead:</p>
+<div class="cmd"><pre id="cmd-compare">Use razor_compare on this repo to compare the plain loop and Razor on: the login form accepts an empty password</pre><button class="copy" data-copy="cmd-compare" onclick="copyCmd(this)">Copy</button></div>
+<p class="muted">Other clients (Codex, Gemini CLI, Cursor, VS Code, Kiro) use the same server — <a href="/guide#mcp">per-client setup in the guide</a>, with the key in the config's <code>env</code> block. The four read-only tools need no key; razor_compare needs your key too, capped at $1.00 a pair. Code: <a href="https://github.com/NSmonish/razor-mcp">github.com/NSmonish/razor-mcp</a>.</p>
 </section>
 
 <section class="block">
@@ -355,7 +358,7 @@ ${R.benches.filter(b => b.naive && b.razor).map(b => `<div class="card"><h3>${b.
 <div class="grid3">
 <div class="card"><h3>Does Razor do the coding?</h3><p class="muted">No — your coding agent does. Razor writes the guide it follows.</p></div>
 <div class="card"><h3>Can we inspect the output?</h3><p class="muted">Yes. The guidance is plain readable files: AGENTS.md, topic docs, and check scripts.</p></div>
-<div class="card"><h3>Have you measured savings?</h3><p class="muted">Early results above are promising. We are designing proper trials to measure tokens, context, and time rigorously.</p></div>
+<div class="card"><h3>Have you measured savings?</h3><p class="muted">Early results above are promising. And you can measure it yourself: razor_compare runs your own bug twice and shows you the tokens and cost side by side.</p></div>
 <div class="card"><h3>How do we try it?</h3><p class="muted">Give us 20 minutes: show us a recent task, where you corrected the agent, and what instructions you use. Contact: lc4008@columbia.edu</p></div>
 </div>
 </section>
@@ -469,7 +472,7 @@ ${R.benches.map(benchCard).join('\n')}
 
 <section class="block" id="mcp">
 <h2>Use the static stage on its own (MCP)</h2>
-<p>The MCP server gives your agent five tools: <code>razor_fix</code>, which fixes one bug and returns a patch only if the tests pass, plus four read-only tools — <code>locate</code>, <code>map_repo</code>, <code>skeleton</code>, <code>module_brief</code> — running entirely on your machine. The read-only tools need no key. <code>razor_fix</code> needs your OpenAI key, put in your shell first (<code>export OPENAI_API_KEY=sk-your-key</code>) and passed through the config's <code>env</code> block, so it never lands in a file. The same server works in every client below.</p>
+<p>The MCP server gives your agent six tools: <code>razor_fix</code>, which fixes one bug and returns a patch only if the tests pass, <code>razor_compare</code>, which runs one bug twice and shows you the tokens and cost side by side so you can see for yourself how much you save, plus four read-only tools — <code>locate</code>, <code>map_repo</code>, <code>skeleton</code>, <code>module_brief</code> — running entirely on your machine. The read-only tools need no key. <code>razor_fix</code> and <code>razor_compare</code> need your OpenAI key, put in your shell first (<code>export OPENAI_API_KEY=sk-your-key</code>) and passed through the config's <code>env</code> block, so it never lands in a file. The same server works in every client below.</p>
 <p><b>Claude Code</b> (one command, key included safely):</p>
 <div class="cmd"><pre id="cmd-guide-add">claude mcp add razor -e OPENAI_API_KEY='\${OPENAI_API_KEY}' -- npx -y github:NSmonish/razor-mcp</pre><button class="copy" data-copy="cmd-guide-add" onclick="copyCmd(this)">Copy</button></div>
 <p><b>Codex</b></p>
@@ -503,7 +506,7 @@ args = ["-y", "github:NSmonish/razor-mcp"]</pre>
   }
 }</pre>
 <p><b>Kiro</b> — <code>.kiro/settings/mcp.json</code> in the workspace, same <code>mcpServers</code> shape as Gemini above.</p>
-<p class="muted">After editing a config file by hand, restart that client. Then ask your agent to fix a bug with <code>razor_fix</code>; it returns a patch only if the tests pass, capped at $0.50 a fix. Code: <a href="https://github.com/NSmonish/razor-mcp">github.com/NSmonish/razor-mcp</a>.</p>
+<p class="muted">After editing a config file by hand, restart that client. Then ask your agent to fix a bug with <code>razor_fix</code>; it returns a patch only if the tests pass, capped at $0.50 a fix. Or ask for a comparison with <code>razor_compare</code>, capped at $1.00 a pair, and see for yourself how much you save. Code: <a href="https://github.com/NSmonish/razor-mcp">github.com/NSmonish/razor-mcp</a>.</p>
 </section>
 
 <section class="cta-band">
