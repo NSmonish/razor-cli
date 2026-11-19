@@ -335,7 +335,7 @@ ${R.benches.filter(b => b.naive && b.razor).map(b => `<div class="card"><h3>${b.
 <h2>Set it up in your agent in 2 minutes</h2>
 <p>The MCP server gives your agent six tools. The one that matters most is <b>razor_fix</b>: give it a repo and a bug, and it runs the Step 3 loop and returns a patch only if the tests pass. The other four hand your agent locations to work from. And <b>razor_compare</b> runs one bug twice, plain loop vs Step 3, and shows you the tokens and cost side by side, so you can see for yourself how much you save. Everything runs on your machine.</p>
 <div class="grid3">
-<div class="card"><h3>razor_fix</h3><p class="muted">Fix one bug: runs the Step 3 loop, returns a patch only if the tests pass. Uses your OpenAI key, capped at $0.50 a fix.</p></div>
+<div class="card"><h3>razor_fix</h3><p class="muted">Fix one bug: runs the Step 3 loop, returns a patch only if the tests pass. It also returns an inspectable step-by-step trace (records) of what it read, edited, and tested. Uses your OpenAI key, capped at $0.50 a fix.</p></div>
 <div class="card"><h3>razor_compare</h3><p class="muted">Run one bug twice, plain loop vs Step 3: tokens, cost, and who solved, side by side. Uses your OpenAI key, capped at $1.00 a pair.</p></div>
 <div class="card"><h3>locate</h3><p class="muted">Rank repo files for a bug report, from symbol names, paths, and import-graph rank. No LLM, deterministic.</p></div>
 <div class="card"><h3>map_repo</h3><p class="muted">Stack, file counts, and the PageRank-ordered file list, budgeted.</p></div>
